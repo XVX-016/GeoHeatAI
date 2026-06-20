@@ -6,18 +6,44 @@ import { Switch } from "@/components/ui/switch";
 
 const CITIES = ["Delhi NCR", "Mumbai", "Bengaluru", "Chennai", "Hyderabad"] as const;
 const LAYER_CONFIG = [
-  { name: "LST (Landsat 8)", colorClass: "bg-[#EF4444]", key: "lst" },
-  { name: "NDVI", colorClass: "bg-[#22c55e]", key: "ndvi" },
-  { name: "NDBI", colorClass: "bg-[#a78bfa]", key: "ndbi" },
-  { name: "Building density", colorClass: "bg-[#FBBF24]", key: "density" },
-  { name: "ERA5 air temp", colorClass: "bg-[#60a5fa]", key: "era5" },
+  {
+    name: "LST (Landsat 8)",
+    description: "Land surface temperature from thermal satellite bands",
+    colorClass: "bg-[#EF4444]",
+    key: "lst",
+  },
+  {
+    name: "NDVI",
+    description: "Vegetation health and canopy cooling index",
+    colorClass: "bg-[#22c55e]",
+    key: "ndvi",
+  },
+  {
+    name: "NDBI",
+    description: "Built-up surface index for dense construction",
+    colorClass: "bg-[#a78bfa]",
+    key: "ndbi",
+  },
+  {
+    name: "Building density",
+    description: "Impervious mass and compact urban form",
+    colorClass: "bg-[#FBBF24]",
+    key: "density",
+  },
+  {
+    name: "ERA5 air temp",
+    description: "Regional atmospheric temperature baseline",
+    colorClass: "bg-[#60a5fa]",
+    key: "era5",
+  },
 ] as const;
+
 const PROGRESS_STEPS = [
   "FETCHING LANDSAT SCENES",
   "CLOUD MASKING",
   "ERA5 ALIGNMENT",
   "FEATURE EXTRACTION",
-  "✓ PIPELINE COMPLETE",
+  "PIPELINE COMPLETE",
 ] as const;
 
 export const Route = createFileRoute("/app/map")({
@@ -25,7 +51,7 @@ export const Route = createFileRoute("/app/map")({
 });
 
 function MapPage() {
-  const [city, setCity] = useState<typeof CITIES[number]>("Delhi NCR");
+  const [city, setCity] = useState<(typeof CITIES)[number]>("Delhi NCR");
   const [fromDate, setFromDate] = useState("2026-06-01");
   const [toDate, setToDate] = useState("2026-06-15");
   const [layers, setLayers] = useState({
@@ -69,13 +95,12 @@ function MapPage() {
     () =>
       PROGRESS_STEPS.map((step, index) => {
         const active = index === stepIndex && isRunning;
-        const completed = index < stepIndex || (index === stepIndex && step === "✓ PIPELINE COMPLETE");
-        const textColor = completed ? "text-white" : "text-[#6b6b6b]";
+        const completed =
+          index < stepIndex || (index === stepIndex && step === "PIPELINE COMPLETE");
+        const textColor = completed ? "text-white" : "text-[#a0a0a0]";
         return (
-          <div key={step} className={`font-mono text-[11px] ${textColor} leading-tight`}>
-            {active && step !== "✓ PIPELINE COMPLETE"
-              ? `${step} ${".".repeat(dotCount + 1)}`
-              : step}
+          <div key={step} className={`font-mono text-[11px] leading-tight ${textColor}`}>
+            {active && step !== "PIPELINE COMPLETE" ? `${step} ${".".repeat(dotCount + 1)}` : step}
           </div>
         );
       }),
@@ -93,15 +118,15 @@ function MapPage() {
     <div className="flex h-full min-h-[calc(100vh-3rem)] gap-6">
       <aside className="w-[280px] flex-shrink-0 border-r border-[#1a1a1a] pr-5">
         <div className="space-y-6 py-4">
-          <section className="space-y-3">
+          <section className="space-y-4">
             <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">LOCATION</div>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <label className="block">
                 <span className="font-mono text-[10px] uppercase text-[#6b6b6b]">City</span>
                 <select
                   value={city}
-                  onChange={(event) => setCity(event.target.value as typeof CITIES[number])}
-                  className="mt-2 w-full rounded-none border border-[#2a2a2a] bg-black px-3 py-2 text-[12px] font-mono text-white outline-none focus:border-[#F97316]"
+                  onChange={(event) => setCity(event.target.value as (typeof CITIES)[number])}
+                  className="mt-2 w-full rounded-none border border-[#1a1a1a] bg-black px-3 py-2 font-mono text-[12px] text-white outline-none focus:border-[#F97316]"
                 >
                   {CITIES.map((option) => (
                     <option key={option} value={option} className="bg-black text-white">
@@ -113,6 +138,9 @@ function MapPage() {
 
               <div>
                 <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">Date range</div>
+                <p className="mt-1 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+                  Satellite scene window for LST and index comparison.
+                </p>
                 <div className="mt-2 flex gap-3">
                   <label className="block w-full">
                     <span className="sr-only">From date</span>
@@ -121,7 +149,7 @@ function MapPage() {
                       value={fromDate}
                       onChange={(event) => setFromDate(event.target.value)}
                       aria-label="From date"
-                      className="w-full rounded-none border border-[#2a2a2a] bg-black px-3 py-2 text-[12px] font-mono text-white outline-none focus:border-[#F97316]"
+                      className="w-full rounded-none border border-[#1a1a1a] bg-black px-3 py-2 font-mono text-[12px] text-white outline-none focus:border-[#F97316]"
                     />
                   </label>
                   <label className="block w-full">
@@ -131,7 +159,7 @@ function MapPage() {
                       value={toDate}
                       onChange={(event) => setToDate(event.target.value)}
                       aria-label="To date"
-                      className="w-full rounded-none border border-[#2a2a2a] bg-black px-3 py-2 text-[12px] font-mono text-white outline-none focus:border-[#F97316]"
+                      className="w-full rounded-none border border-[#1a1a1a] bg-black px-3 py-2 font-mono text-[12px] text-white outline-none focus:border-[#F97316]"
                     />
                   </label>
                 </div>
@@ -139,22 +167,27 @@ function MapPage() {
             </div>
           </section>
 
-          <section className="border-t border-[#1a1a1a] pt-4 mt-4 space-y-4">
+          <section className="mt-4 space-y-4 border-t border-[#1a1a1a] pt-4">
             <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">LAYERS</div>
-            <div className="space-y-3">
-              {LAYER_CONFIG.map((layer, index) => (
-                <div key={layer.key} className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
+            <div className="space-y-4">
+              {LAYER_CONFIG.map((layer) => (
+                <div key={layer.key} className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
                     <Switch
                       checked={layers[layer.key]}
                       onCheckedChange={(checked) =>
                         setLayers((current) => ({ ...current, [layer.key]: checked }))
                       }
-                      className="data-[state=checked]:bg-[#F97316]"
+                      className="mt-0.5 data-[state=checked]:bg-[#F97316]"
                     />
-                    <span className="font-mono text-[11px] text-white">{layer.name}</span>
+                    <div>
+                      <div className="font-mono text-[11px] text-white">{layer.name}</div>
+                      <div className="mt-1 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+                        {layer.description}
+                      </div>
+                    </div>
                   </div>
-                  <span className={`h-3 w-3 rounded-full ${layer.colorClass}`} />
+                  <span className={`mt-1 h-3 w-3 flex-shrink-0 rounded-full ${layer.colorClass}`} />
                 </div>
               ))}
             </div>
@@ -163,8 +196,15 @@ function MapPage() {
           <section className="space-y-4">
             <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">PARAMETERS</div>
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">Cloud cover threshold</div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">
+                    Cloud cover threshold
+                  </div>
+                  <p className="mt-1 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+                    Rejects scenes with too much cloud contamination.
+                  </p>
+                </div>
                 <div className="font-mono text-[10px] text-[#F97316]">{cloudCover}%</div>
               </div>
               <Slider
@@ -187,24 +227,22 @@ function MapPage() {
             <button
               type="button"
               onClick={startPipeline}
-              className="w-full rounded-none bg-white px-4 py-3 text-[12px] font-mono uppercase tracking-wide text-black transition-colors hover:bg-[#F97316] hover:text-white"
+              className="w-full rounded-none bg-white px-4 py-3 font-mono text-[12px] uppercase tracking-wide text-black transition-colors hover:bg-[#F97316] hover:text-white"
             >
               RUN INGESTION
             </button>
-            <div className="space-y-2">
-              {progressEntries}
-            </div>
+            <div className="space-y-2">{progressEntries}</div>
           </div>
         </div>
       </aside>
 
       <section className="relative flex-1">
         <div className="relative h-full min-h-[calc(100vh-3rem)] overflow-hidden rounded-xl bg-[#0a0a0a]">
-          <div className="absolute inset-0 grid place-items-center text-[11px] text-[#3a3a3a] font-mono">
-            MAPLIBRE GL — 28.6139°N 77.2090°E
+          <div className="absolute inset-0 grid place-items-center text-center font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+            MapLibre GL viewport centered on Delhi NCR: 28.6139°N, 77.2090°E
           </div>
 
-          <div className="absolute right-6 top-6 flex items-center gap-2 rounded-full border border-[#2a2a2a] bg-black/80 p-1.5">
+          <div className="absolute right-6 top-6 flex items-center gap-2 rounded-full border border-[#1a1a1a] bg-black/80 p-1.5">
             {(["BASELINE", "OPTIMIZED"] as const).map((mode) => {
               const active = viewMode === mode;
               return (
@@ -212,9 +250,9 @@ function MapPage() {
                   key={mode}
                   type="button"
                   onClick={() => setViewMode(mode)}
-                  className={`rounded-full px-3 py-1 text-[10px] font-mono uppercase tracking-wide transition-colors ${
-                    active ? "bg-white text-black" : "bg-black text-[#6b6b6b]"
-                  } border border-[#2a2a2a]`}
+                  className={`rounded-full border border-[#1a1a1a] px-3 py-1 font-mono text-[10px] uppercase tracking-wide transition-colors ${
+                    active ? "bg-white text-black" : "bg-black text-[#a0a0a0]"
+                  }`}
                 >
                   {mode}
                 </button>
@@ -222,26 +260,31 @@ function MapPage() {
             })}
           </div>
 
-          <div className="absolute left-6 bottom-28 w-56 rounded-xl border border-[#1a1a1a] bg-black/80 p-3">
+          <div className="absolute bottom-28 left-6 w-60 rounded-xl border border-[#1a1a1a] bg-black/80 p-5">
             <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">CURSOR</div>
-            <div className="mt-2 text-[11px] font-mono text-white">28.6192°N 77.2198°E</div>
-            <div className="mt-3 text-[13px] font-mono text-[#F97316]">42.3°C</div>
-            <div className="mt-2 font-mono text-[10px] uppercase text-[#6b6b6b]">ROHINI — ZONE IV</div>
+            <div className="mt-2 font-mono text-[11px] text-white">28.6192°N 77.2198°E</div>
+            <div className="mt-3 font-mono text-[13px] text-[#F97316]">42.3°C LST</div>
+            <div className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+              Rohini, Zone IV: sampled land surface temperature.
+            </div>
           </div>
 
-          <div className="absolute right-6 bottom-28 w-56 rounded-xl border border-[#1a1a1a] bg-black/80 p-3">
+          <div className="absolute bottom-28 right-6 w-60 rounded-xl border border-[#1a1a1a] bg-black/80 p-5">
             <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">LAND SURFACE TEMP</div>
-            <div className="mt-3 h-2 w-40 rounded-full bg-gradient-to-r from-[#1d4ed8] via-[#FBBF24] to-[#EF4444]" />
-            <div className="mt-3 flex justify-between font-mono text-[9px] text-[#6b6b6b]">
+            <div className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+              LST scale from cooler surfaces to severe heat hotspots.
+            </div>
+            <div className="mt-4 h-2 w-44 rounded-full bg-gradient-to-r from-[#1d4ed8] via-[#FBBF24] to-[#EF4444]" />
+            <div className="mt-3 flex justify-between font-mono text-[9px] text-[#a0a0a0]">
               <span>25°C</span>
               <span>40°C</span>
               <span>55°C</span>
             </div>
           </div>
 
-          <Marker className="left-[20%] top-[24%]" label="ROHINI · 47°C" />
-          <Marker className="left-[60%] top-[40%]" label="OKHLA · 45°C" />
-          <Marker className="left-[45%] top-[70%]" label="SHAHDARA · 44°C" />
+          <Marker className="left-[20%] top-[24%]" label="ROHINI · 47°C LST" />
+          <Marker className="left-[60%] top-[40%]" label="OKHLA · 45°C LST" />
+          <Marker className="left-[45%] top-[70%]" label="SHAHDARA · 44°C LST" />
         </div>
       </section>
     </div>
@@ -255,7 +298,7 @@ function Marker({ className, label }: { className: string; label: string }) {
         <div className="relative h-2.5 w-2.5 rounded-full bg-[#EF4444]">
           <span className="absolute inset-0 animate-ping rounded-full bg-[#EF4444]/40" />
         </div>
-        <div className="rounded-md bg-black/60 px-1.5 py-0.5 text-[9px] font-mono text-[#F97316]">
+        <div className="rounded-md bg-black/60 px-2 py-1 font-mono text-[9px] text-[#F97316]">
           {label}
         </div>
       </div>

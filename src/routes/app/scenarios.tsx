@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -13,7 +13,7 @@ const loadingSteps = [
   "EVALUATING 2,400 CANDIDATE SOLUTIONS",
   "SOLVING NSGA-III PARETO FRONT",
   "GENERATING INTERVENTION MAP",
-  "✓ OPTIMIZATION COMPLETE",
+  "OPTIMIZATION COMPLETE",
 ] as const;
 
 export const Route = createFileRoute("/app/scenarios")({
@@ -23,21 +23,19 @@ export const Route = createFileRoute("/app/scenarios")({
 function ScenariosPage() {
   const [greeningEnabled, setGreeningEnabled] = useState(true);
   const [greeningValue, setGreeningValue] = useState(20);
-  const [greeningType, setGreeningType] = useState<typeof interventionOptions.greening[number]>(
+  const [greeningType, setGreeningType] = useState<(typeof interventionOptions.greening)[number]>(
     "MIXED",
   );
 
   const [roofValue, setRoofValue] = useState(0.65);
   const [roofCoverage, setRoofCoverage] = useState(60);
-  const [roofType, setRoofType] = useState<typeof interventionOptions.roofs[number]>(
+  const [roofType, setRoofType] = useState<(typeof interventionOptions.roofs)[number]>(
     "REFLECTIVE MEM.",
   );
 
   const [blueEnabled, setBlueEnabled] = useState(false);
   const [blueArea, setBlueArea] = useState(0);
-  const [blueType, setBlueType] = useState<typeof interventionOptions.blue[number]>(
-    "DRAINAGE",
-  );
+  const [blueType, setBlueType] = useState<(typeof interventionOptions.blue)[number]>("DRAINAGE");
 
   const [running, setRunning] = useState(false);
   const [progressIndex, setProgressIndex] = useState(-1);
@@ -71,15 +69,11 @@ function ScenariosPage() {
     () =>
       loadingSteps.map((step, idx) => {
         const active = idx === progressIndex && running;
-        const completed = idx < progressIndex || (!running && idx === loadingSteps.length - 1);
+        const completed = idx < progressIndex || idx === loadingSteps.length - 1;
         return (
           <div
             key={step}
-            className={`font-mono text-[10px] ${
-              step === loadingSteps[loadingSteps.length - 1] && completed
-                ? "text-white"
-                : "text-[#6b6b6b]"
-            }`}
+            className={`font-mono text-[10px] ${completed ? "text-white" : "text-[#a0a0a0]"}`}
           >
             {active && step !== loadingSteps[loadingSteps.length - 1]
               ? `${step} ${".".repeat(dotCount + 1)}`
@@ -89,11 +83,6 @@ function ScenariosPage() {
       }),
     [dotCount, running, progressIndex],
   );
-
-  const deployGreening = (type: typeof interventionOptions.greening[number]) =>
-    setGreeningType(type);
-  const deployRoof = (type: typeof interventionOptions.roofs[number]) => setRoofType(type);
-  const deployBlue = (type: typeof interventionOptions.blue[number]) => setBlueType(type);
 
   const startOptimization = () => {
     if (running) return;
@@ -106,14 +95,22 @@ function ScenariosPage() {
 
   return (
     <div className="flex min-h-full">
-      <aside className="w-[360px] shrink-0 border-r border-[#1a1a1a] px-6 py-6 overflow-y-auto">
+      <aside className="w-[360px] shrink-0 overflow-y-auto border-r border-[#1a1a1a] px-6 py-6">
         <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">
           INTERVENTION CONTROLS
         </div>
+        <p className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+          Tune cooling interventions before running the optimization model.
+        </p>
 
-        <InterventionCard disabled={false} className="mt-6">
-          <CardHeader title="URBAN GREENING" enabled={greeningEnabled} onToggle={setGreeningEnabled} />
+        <InterventionCard className="mt-6">
+          <CardHeader
+            title="URBAN GREENING"
+            enabled={greeningEnabled}
+            onToggle={setGreeningEnabled}
+          />
           <CardLabel label="NDVI INCREASE TARGET" />
+          <CompanionText>NDVI measures vegetation health and canopy cooling potential.</CompanionText>
           <SliderField value={`${greeningValue}%`}>
             <Slider
               value={[greeningValue]}
@@ -132,27 +129,18 @@ function ScenariosPage() {
           <CardLabel label="INTERVENTION TYPE" />
           <div className="mt-2 flex flex-wrap gap-2">
             {interventionOptions.greening.map((type) => (
-              <Chip
-                key={type}
-                active={type === greeningType}
-                onClick={() => deployGreening(type)}
-              >
+              <Chip key={type} active={type === greeningType} onClick={() => setGreeningType(type)}>
                 {type}
               </Chip>
             ))}
           </div>
-          <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-[#6b6b6b]">
-            <span>EST. COST</span>
-            <span className="text-white">₹ 12,400 CR</span>
-          </div>
-          <div className="mt-2 font-mono text-[12px] text-[#1D9E75]">
-            −1.5°C TO −3.0°C REDUCTION
-          </div>
+          <CostBlock cost="₹ 12,400 CR" impact="-1.5°C to -3.0°C reduction" />
         </InterventionCard>
 
         <InterventionCard className="mt-6">
           <CardHeader title="COOL ROOFS" enabled onToggle={() => undefined} />
           <CardLabel label="ALBEDO TARGET" />
+          <CompanionText>Albedo is surface reflectivity; higher values send more heat away.</CompanionText>
           <SliderField value={roofValue.toFixed(2)}>
             <Slider
               value={[roofValue]}
@@ -169,6 +157,7 @@ function ScenariosPage() {
             </Slider>
           </SliderField>
           <CardLabel label="BUILDING COVERAGE" />
+          <CompanionText>Share of rooftops treated with high-reflectance material.</CompanionText>
           <SliderField value={`${roofCoverage}%`}>
             <Slider
               value={[roofCoverage]}
@@ -187,23 +176,18 @@ function ScenariosPage() {
           <CardLabel label="MATERIAL TYPE" />
           <div className="mt-2 flex flex-wrap gap-2">
             {interventionOptions.roofs.map((type) => (
-              <Chip key={type} active={type === roofType} onClick={() => deployRoof(type)}>
+              <Chip key={type} active={type === roofType} onClick={() => setRoofType(type)}>
                 {type}
               </Chip>
             ))}
           </div>
-          <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-[#6b6b6b]">
-            <span>EST. COST</span>
-            <span className="text-white">₹ 8,200 CR</span>
-          </div>
-          <div className="mt-2 font-mono text-[12px] text-[#1D9E75]">
-            −0.5°C TO −2.0°C REDUCTION
-          </div>
+          <CostBlock cost="₹ 8,200 CR" impact="-0.5°C to -2.0°C reduction" />
         </InterventionCard>
 
         <InterventionCard disabled={!blueEnabled} className="mt-6">
           <CardHeader title="BLUE INFRASTRUCTURE" enabled={blueEnabled} onToggle={setBlueEnabled} />
           <CardLabel label="WATER BODY AREA" />
+          <CompanionText>Cooling from ponds, drainage corridors, and water-sensitive urban design.</CompanionText>
           <SliderField value={`${blueArea} ha`}>
             <Slider
               value={[blueArea]}
@@ -222,43 +206,36 @@ function ScenariosPage() {
           <CardLabel label="PLACEMENT" />
           <div className="mt-2 flex flex-wrap gap-2">
             {interventionOptions.blue.map((type) => (
-              <Chip key={type} active={type === blueType} onClick={() => deployBlue(type)}>
+              <Chip key={type} active={type === blueType} onClick={() => setBlueType(type)}>
                 {type}
               </Chip>
             ))}
           </div>
-          <div className="mt-3 flex items-center justify-between font-mono text-[10px] text-[#6b6b6b]">
-            <span>EST. COST</span>
-            <span className="text-white">₹ 3,800 CR</span>
-          </div>
-          <div className="mt-2 font-mono text-[12px] text-[#1D9E75]">
-            −0.3°C TO −1.5°C REDUCTION
-          </div>
+          <CostBlock cost="₹ 3,800 CR" impact="-0.3°C to -1.5°C reduction" />
         </InterventionCard>
 
-        <div className="border-t border-[#1a1a1a] pt-5 mt-5">
-          <div className="font-mono text-[10px] text-[#6b6b6b] uppercase">AREA BUDGET UTILIZATION</div>
+        <div className="mt-6 border-t border-[#1a1a1a] pt-5">
+          <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">AREA BUDGET UTILIZATION</div>
+          <p className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+            Treated land share compared with the planning cap.
+          </p>
           <div className="mt-3 h-1.5 w-full rounded-full bg-[#1a1a1a]">
             <div className="h-full w-[11.2%] rounded-full bg-[#F97316]" />
           </div>
-          <div className="mt-1 flex justify-between font-mono text-[10px]">
-            <span className="text-[#6b6b6b]">11.2% USED</span>
+          <div className="mt-2 flex justify-between font-mono text-[10px]">
+            <span className="text-[#a0a0a0]">11.2% USED</span>
             <span className="text-white">15.0% CAP</span>
           </div>
-          <div className="mt-3 text-[#EF4444] font-mono text-[10px]">
-            ⚠ BUDGET EXCEEDED
-          </div>
+          <div className="mt-3 font-mono text-[10px] text-[#1D9E75]">WITHIN AREA BUDGET</div>
         </div>
 
         {running ? (
-          <div className="mt-6 space-y-2 font-mono text-[10px] text-[#6b6b6b]">
-            {steps}
-          </div>
+          <div className="mt-6 space-y-2">{steps}</div>
         ) : (
           <button
             type="button"
             onClick={startOptimization}
-            className="mt-6 w-full rounded-none bg-white py-3 text-[11px] font-mono uppercase tracking-wider text-black transition-colors hover:bg-[#F97316] hover:text-white"
+            className="mt-6 w-full rounded-none bg-white py-3 font-mono text-[11px] uppercase tracking-wider text-black transition-colors hover:bg-[#F97316] hover:text-white"
           >
             RUN OPTIMIZATION
           </button>
@@ -267,33 +244,68 @@ function ScenariosPage() {
 
       <main className="flex-1 px-6 py-6">
         <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">SCENARIO OUTPUT</div>
+        <p className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+          Compare the current heat map against the optimized cooling intervention plan.
+        </p>
 
         {!showResults ? (
-          <div className="mt-6 flex h-72 items-center justify-center rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] font-mono text-[11px] text-[#3a3a3a]">
-            RUN OPTIMIZATION TO GENERATE COOLED LST MAP
+          <div className="mt-6 flex h-72 items-center justify-center rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] px-6 text-center font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+            Run optimization to generate the cooled LST map.
           </div>
         ) : (
           <>
             <div className="mt-6 grid gap-6 lg:grid-cols-2">
-              <ResultPanel label="BASELINE LST" />
-              <ResultPanel label="OPTIMIZED LST" />
+              <ResultPanel
+                label="BASELINE LST"
+                description="Current land surface temperature before intervention."
+              />
+              <ResultPanel
+                label="OPTIMIZED LST"
+                description="Projected land surface temperature after cooling strategy."
+              />
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <MetricCard label="TEMP REDUCTION" value="−2.8°C" valueClass="text-[#1D9E75] text-[28px] font-semibold" />
-              <MetricCard label="HOTSPOTS ELIMINATED" value="14 of 22" valueClass="text-white text-[28px] font-semibold" />
-              <MetricCard label="AREA TREATED" value="118 km²" valueClass="text-white text-[28px] font-semibold" />
-              <MetricCard label="COST EFFICIENCY" value="₹ 4,428 CR/°C" valueClass="text-white text-[20px] font-semibold" />
+              <MetricCard
+                label="TEMP REDUCTION"
+                description="Temperature reduction (ΔT)"
+                value="-2.8°C"
+                valueClass="text-[#1D9E75] text-[28px] font-semibold"
+              />
+              <MetricCard
+                label="HOTSPOTS ELIMINATED"
+                description="Severe heat zones improved"
+                value="14 of 22"
+                valueClass="text-white text-[28px] font-semibold"
+              />
+              <MetricCard
+                label="AREA TREATED"
+                description="Total intervention coverage"
+                value="118 km²"
+                valueClass="text-white text-[28px] font-semibold"
+              />
+              <MetricCard
+                label="COST EFFICIENCY"
+                description="Cost per degree of cooling achieved"
+                value="₹ 4,428 CR/°C"
+                valueClass="text-white text-[20px] font-semibold"
+              />
             </div>
 
-            <div className="mt-4 rounded-xl border border-[#F97316]/30 bg-[#F97316]/5 p-5">
-              <div className="font-mono text-[10px] text-[#6b6b6b] uppercase">
-                RECOMMENDED STRATEGY — PARETO OPTIMAL
+            <div className="mt-6 rounded-xl border border-[#1a1a1a] bg-[#F97316]/5 p-6">
+              <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">
+                RECOMMENDED STRATEGY: PARETO OPTIMAL
               </div>
-              <div className="mt-4 space-y-3 font-mono text-[12px] text-white">
-                <div>→ URBAN GREENING · 22% NDVI INCREASE · MIXED TYPOLOGY · ROHINI + OKHLA PRIORITY</div>
-                <div>→ COOL ROOFS · ALBEDO 0.65 · 68% BUILDING COVERAGE · INDUSTRIAL ZONES FIRST</div>
-                <div>→ BLUE INFRA · 180 HA · DRAINAGE CORRIDOR PLACEMENT · PHASE 2</div>
+              <div className="mt-4 space-y-3 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+                <div>
+                  Urban greening: 22% NDVI increase across Rohini and Okhla priority zones.
+                </div>
+                <div>
+                  Cool roofs: albedo 0.65 across 68% of buildings, starting with industrial zones.
+                </div>
+                <div>
+                  Blue infrastructure: 180 ha of drainage-corridor cooling in phase two.
+                </div>
               </div>
             </div>
           </>
@@ -308,7 +320,7 @@ function InterventionCard({
   disabled,
   className,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   disabled?: boolean;
   className?: string;
 }) {
@@ -345,14 +357,17 @@ function CardHeader({
 }
 
 function CardLabel({ label }: { label: string }) {
-  return <div className="mt-3 font-mono text-[10px] text-[#6b6b6b]">{label}</div>;
+  return <div className="mt-4 font-mono text-[10px] uppercase text-[#6b6b6b]">{label}</div>;
 }
 
-function SliderField({ children, value }: { children: React.ReactNode; value: string }) {
+function CompanionText({ children }: { children: ReactNode }) {
+  return <p className="mt-1 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">{children}</p>;
+}
+
+function SliderField({ children, value }: { children: ReactNode; value: string }) {
   return (
-    <div className="mt-2 space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="font-mono text-[10px] text-[#6b6b6b]"> </div>
+    <div className="mt-3 space-y-3">
+      <div className="flex items-center justify-end">
         <div className="font-mono text-[13px] text-[#F97316]">{value}</div>
       </div>
       {children}
@@ -365,7 +380,7 @@ function Chip({
   active,
   onClick,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   active: boolean;
   onClick: () => void;
 }) {
@@ -373,8 +388,8 @@ function Chip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded border px-2 py-1 text-[10px] font-mono uppercase transition-colors ${
-        active ? "border-[#F97316] text-white" : "border-[#2a2a2a] text-[#6b6b6b]"
+      className={`rounded border px-2 py-1 font-mono text-[10px] uppercase transition-colors ${
+        active ? "border-[#F97316] text-white" : "border-[#1a1a1a] text-[#a0a0a0]"
       }`}
     >
       {children}
@@ -382,27 +397,46 @@ function Chip({
   );
 }
 
-function ResultPanel({ label }: { label: string }) {
+function CostBlock({ cost, impact }: { cost: string; impact: string }) {
   return (
-    <div className="flex h-72 items-center justify-center rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] text-center font-mono text-[11px] text-[#3a3a3a]">
-      {label}
+    <div className="mt-4">
+      <div className="flex items-center justify-between font-mono text-[10px]">
+        <span className="uppercase text-[#6b6b6b]">EST. COST</span>
+        <span className="text-white">{cost}</span>
+      </div>
+      <div className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
+        Expected land surface temperature impact.
+      </div>
+      <div className="mt-1 font-mono text-[12px] text-[#1D9E75]">{impact}</div>
+    </div>
+  );
+}
+
+function ResultPanel({ label, description }: { label: string; description: string }) {
+  return (
+    <div className="flex h-72 flex-col items-center justify-center rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-6 text-center">
+      <div className="font-mono text-[11px] text-white">{label}</div>
+      <div className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">{description}</div>
     </div>
   );
 }
 
 function MetricCard({
   label,
+  description,
   value,
   valueClass,
 }: {
   label: string;
+  description: string;
   value: string;
   valueClass: string;
 }) {
   return (
-    <div className="rounded-xl border border-[#1a1a1a] p-4 bg-[#0a0a0a]">
+    <div className="rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] p-5">
       <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">{label}</div>
-      <div className={valueClass}>{value}</div>
+      <div className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">{description}</div>
+      <div className={`mt-4 ${valueClass}`}>{value}</div>
     </div>
   );
 }
