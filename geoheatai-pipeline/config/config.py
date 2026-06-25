@@ -23,7 +23,7 @@ SERVICE_ACCOUNT_KEY_PATH = Path(
 # Google Earth Engine project
 # ---------------------------------------------------------------------------
 # Set this via the environment, or edit the fallback once your GCP project exists.
-GEE_PROJECT_ID = os.getenv("GEE_PROJECT_ID", "CHANGE_ME_geoheatai_delhi")
+GEE_PROJECT_ID = os.getenv("GEE_PROJECT_ID", "geoheatai")
 
 # ---------------------------------------------------------------------------
 # Target city — Delhi NCR (primary target for hackathon submission)
@@ -65,7 +65,7 @@ COLLECTIONS = {
     "sentinel2_sr": "COPERNICUS/S2_SR_HARMONIZED",
     "era5_hourly": "ECMWF/ERA5_LAND/HOURLY",
     "dynamic_world": "GOOGLE/DYNAMICWORLD/V1",  # backup LULC if needed
-    "ghsl_built_height": "JRC/GHSL/P2023A/GHS_BUILT_H_ANBH",
+    "ghsl_built_height": "JRC/GHSL/P2023A/GHS_BUILT_H/2018",
     "ghsl_built_surface": "JRC/GHSL/P2023A/GHS_BUILT_S",
 }
 

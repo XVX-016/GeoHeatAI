@@ -123,12 +123,18 @@ def run_phase1_export(
     """
     landsat_coll = get_landsat_collection(city=city, months=SUMMER_MONTHS)
     scene_list = landsat_coll.toList(landsat_coll.size())
-    n_scenes = scene_list.size().getInfo()
+    total_scenes = scene_list.size().getInfo()
+    n_scenes = total_scenes
 
     if max_scenes:
         n_scenes = min(n_scenes, max_scenes)
 
-    print(f"Found {n_scenes} Landsat scenes for {city} (summer months {SUMMER_MONTHS}).")
+    print(
+        f"Found {total_scenes} Landsat scenes for {city} "
+        f"(summer months {SUMMER_MONTHS})."
+    )
+    if max_scenes:
+        print(f"Previewing first {n_scenes} scenes because max_scenes={max_scenes}.")
 
     if dry_run:
         print("DRY RUN — listing scene dates only, no export tasks started.\n")
@@ -164,7 +170,7 @@ if __name__ == "__main__":
     init_with_service_account()
 
     # ALWAYS dry-run first to sanity check before spending export quota.
-    run_phase1_export(dry_run=True, max_scenes=10)
+    # run_phase1_export(dry_run=True, max_scenes=None)
 
     # Once the scene list/dates look right, flip dry_run=False to actually export:
-    # run_phase1_export(dry_run=False, max_scenes=10)
+    run_phase1_export(dry_run=False, max_scenes=None)

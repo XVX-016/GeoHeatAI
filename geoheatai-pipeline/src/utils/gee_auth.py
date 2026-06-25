@@ -75,7 +75,7 @@ def verify_connection() -> None:
     image = ee.Image("USGS/SRTMGL1_003")
     info = image.getInfo()
     band_names = [b["id"] for b in info["bands"]]
-    print("✓ Earth Engine connection verified.")
+    print("SUCCESS: Earth Engine connection verified.")
     print(f"  Project: {GEE_PROJECT_ID}")
     print(f"  Test image bands: {band_names}")
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     try:
         init_with_service_account()
     except FileNotFoundError as e:
-        print(f"⚠ {e}")
+        print(f"WARNING: {e}")
         print("\nFalling back to interactive authentication...")
         interactive_fallback()
 

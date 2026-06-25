@@ -51,6 +51,7 @@ def get_ghsl_morphology(city: str = DEFAULT_CITY) -> ee.Image:
         ee.ImageCollection(COLLECTIONS["ghsl_built_surface"])
         .filterBounds(region)
         .mosaic()
+        .select("built_surface")
         .clip(region)
         .rename("BUILT_SURFACE_FRACTION")
     )
