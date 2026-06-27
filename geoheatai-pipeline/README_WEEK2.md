@@ -1,6 +1,37 @@
 # GeoHeatAI — Phase 2 & 3 Development Documentation
 
-This documentation covers data tiling, machine learning baseline models (XGBoost + LightGBM), deep physical modeling (PINN U-Net), multi-objective optimization (NSGA-III), and the FastAPI API server configuration.
+This documentation covers GCS exports, data tiling, machine learning baseline models (XGBoost + LightGBM), deep physical modeling (PINN U-Net), multi-objective optimization (NSGA-III), and the FastAPI API server configuration.
+
+---
+
+## 0. GCS Export Setup (replaces Google Drive)
+To resolve Google Drive storage limit issues, scene exports are sent to Google Cloud Storage (GCS).
+
+1. **Install and Authenticate gcloud CLI**:
+   - Install the gcloud CLI: https://cloud.google.com/sdk/docs/install
+   - Log in and configure application default credentials:
+     ```bash
+     gcloud auth login
+     gcloud auth application-default login
+     gcloud config set project geoheatai
+     ```
+2. **Initialize Bucket & Permissions**:
+   ```bash
+   python setup_gcs.py
+   ```
+3. **Resubmit Failed Tasks to GCS**:
+   ```bash
+   python src/ingestion/run_pipeline.py --resubmit-failed
+   ```
+4. **Poll and Download GeoTIFFs**:
+   ```bash
+   python src/utils/download_from_gcs.py
+   ```
+5. **Run the Complete Pipeline**:
+   Once all files are downloaded, execute the full pipeline runner:
+   ```bash
+   python src/utils/pipeline_runner.py
+   ```
 
 ---
 

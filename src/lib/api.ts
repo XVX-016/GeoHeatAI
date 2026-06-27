@@ -4,7 +4,7 @@
  * in the consuming components.
  */
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : undefined) || "http://localhost:8000";
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {

@@ -30,7 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from config.config import (
     CITY_BOUNDS,
     DEFAULT_CITY,
-    EXPORT_FOLDER_DRIVE,
+    GCS_BUCKET,
     SUMMER_MONTHS,
     TARGET_RESOLUTION_M,
 )
@@ -84,21 +84,21 @@ def build_scene_feature_stack(
     return combined.toFloat()
 
 
-def export_scene_to_drive(
+def export_scene_to_gcs(
     feature_stack: ee.Image, scene_id: str, city: str = DEFAULT_CITY
 ) -> ee.batch.Task:
     """
     Kick off an asynchronous GEE export task for one fully-assembled scene.
-    Writes a multi-band GeoTIFF to Google Drive under EXPORT_FOLDER_DRIVE.
+    Writes a multi-band GeoTIFF to the GCS bucket GCS_BUCKET.
     Returns the Task object so the caller can track status if desired.
     """
     bbox = CITY_BOUNDS[city]["bbox"]
     region = ee.Geometry.Rectangle(bbox)
 
-    task = ee.batch.Export.image.toDrive(
+    task = ee.batch.Export.image.toCloudStorage(
         image=feature_stack.toFloat().clip(region),
         description=f"geoheatai_{city}_{scene_id}",
-        folder=EXPORT_FOLDER_DRIVE,
+        bucket=GCS_BUCKET,
         fileNamePrefix=f"geoheatai_{city}_{scene_id}",
         region=region,
         scale=TARGET_RESOLUTION_M,
@@ -156,7 +156,7 @@ def run_phase1_export(
         scene_id = img.get("system:index").getInfo()
 
         feature_stack = build_scene_feature_stack(img, static_stack, city=city)
-        task = export_scene_to_drive(feature_stack, scene_id, city=city)
+        task = export_scene_to_gcs(feature_stack, scene_id, city=city)
         tasks.append(task)
 
         print(f"  [{i+1}/{n_scenes}] export started: {scene_id} (task id: {task.id})")
@@ -167,13 +167,67 @@ def run_phase1_export(
     return tasks
 
 
+def resubmit_failed_tasks(city: str = DEFAULT_CITY):
+    """
+    Finds failed export tasks from the current batch and resubmits them to GCS.
+    """
+    print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] Querying task list from Earth Engine...")
+    tasks = ee.data.getTaskList()
+    
+    # Filter for failed tasks from our batch (creation timestamp > 1782450000000)
+    failed_tasks = [
+        t for t in tasks 
+        if t.get('state') == 'FAILED' 
+        and t.get('creation_timestamp_ms', 0) > 1782450000000
+        and t.get('description', '').startswith(f"geoheatai_{city}_")
+    ]
+    
+    if not failed_tasks:
+        print("No failed tasks found from the current batch. All clean.")
+        return
+
+    print(f"Found {len(failed_tasks)} failed tasks. Resubmitting to GCS...")
+    static_stack = build_static_layer_stack(city=city)
+    resubmitted_count = 0
+
+    for i, t in enumerate(failed_tasks):
+        desc = t.get('description', '')
+        # Extract scene_id (e.g. from "geoheatai_delhi_ncr_1_LC08_146041_20190530")
+        scene_id = desc.replace(f"geoheatai_{city}_", "")
+        
+        # Resolve instrument: Landsat 8 or Landsat 9
+        if "LC08" in scene_id:
+            img_path = f"LANDSAT/LC08/C02/T1_L2/{scene_id}"
+        elif "LC09" in scene_id:
+            img_path = f"LANDSAT/LC09/C02/T1_L2/{scene_id}"
+        else:
+            print(f"  [{i+1}/{len(failed_tasks)}] Skipping {scene_id}: unknown Landsat instrument")
+            continue
+            
+        print(f"  [{i+1}/{len(failed_tasks)}] Resubmitting {scene_id} ({img_path})...")
+        try:
+            img = ee.Image(img_path)
+            feature_stack = build_scene_feature_stack(img, static_stack, city=city)
+            task = export_scene_to_gcs(feature_stack, scene_id, city=city)
+            resubmitted_count += 1
+            print(f"    Export started. Task ID: {task.id}")
+        except Exception as e:
+            print(f"    ERROR resubmitting {scene_id}: {e}")
+            
+        time.sleep(0.5)
+
+    print(f"\nResubmitted {resubmitted_count} tasks successfully.")
+
+
 if __name__ == "__main__":
     from src.utils.gee_auth import init_with_service_account
 
     init_with_service_account()
 
-    # ALWAYS dry-run first to sanity check before spending export quota.
-    # run_phase1_export(dry_run=True, max_scenes=None)
-
-    # Once the scene list/dates look right, flip dry_run=False to actually export:
-    run_phase1_export(dry_run=False, max_scenes=None)
+    # If --resubmit-failed argument is present, run failed-tasks resubmission
+    if len(sys.argv) > 1 and sys.argv[1] == '--resubmit-failed':
+        resubmit_failed_tasks()
+    else:
+        # Check dry-run setting or submit full GCS export
+        # Set dry_run=False to actually trigger export tasks to GCS
+        run_phase1_export(dry_run=False, max_scenes=None)

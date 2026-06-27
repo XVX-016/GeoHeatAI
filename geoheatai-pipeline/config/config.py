@@ -83,4 +83,7 @@ LANDSAT_OVERPASS_UTC_HOUR_APPROX = 5
 # Export
 # ---------------------------------------------------------------------------
 EXPORT_FOLDER_DRIVE = "GeoHeatAI_Exports"  # Google Drive folder for GEE exports
+GCS_BUCKET = "geoheatai-exports"
+GCS_PREFIX = "geoheatai_delhi_ncr"
 HDF5_TILE_SIZE = 256  # patch size for ML-ready tiles (U-Net input)
+

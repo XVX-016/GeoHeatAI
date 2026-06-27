@@ -21,12 +21,12 @@ function AppShell() {
   });
   const currentPage = APP_NAV.find((item) => pathname === item.to)?.label || "MAP";
 
-  // Poll health every 10 s so the indicator auto-recovers when the backend starts
+  // Poll health every 30 s so the indicator auto-recovers when the backend starts
   const { data: health, isError } = useQuery({
     queryKey: ["health"],
     queryFn: getHealth,
     retry: false,
-    refetchInterval: 10_000,
+    refetchInterval: 30_000,
   });
 
   const pipelineReady = !isError && health?.status === "ok";

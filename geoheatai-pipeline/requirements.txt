@@ -3,6 +3,7 @@ fastapi
 geopandas>=0.14.0
 google-api-python-client
 google-auth-oauthlib
+google-cloud-storage
 h5py>=3.10.0
 lightgbm
 numpy>=1.26.0
