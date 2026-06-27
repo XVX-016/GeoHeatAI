@@ -243,5 +243,19 @@ def main():
     joblib.dump(final_ridge, DATA_PROCESSED / "ridge_meta_model.joblib")
     print(f"Saved serialization models to {DATA_PROCESSED}")
 
+    # 3. Save Metrics for Pipeline Runner
+    xgb_metrics = {
+        "mean_r2": float(np.mean(r2_scores)),
+        "mean_rmse": float(np.mean(rmse_scores)),
+        "mean_mae": float(np.mean(mae_scores))
+    }
+    metrics_path = DATA_PROCESSED / "xgb_metrics.json"
+    with open(metrics_path, "w") as f:
+        json.dump(xgb_metrics, f, indent=2)
+    print(f"Saved XGBoost metrics to {metrics_path}")
+
+    return xgb_metrics
+
 if __name__ == "__main__":
     main()
+

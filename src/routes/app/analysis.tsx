@@ -1,9 +1,12 @@
 import { lazy, Suspense, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { getDrivers } from "@/lib/api";
 
 const ShapBarChart = lazy(() => import("@/components/ShapBarChart"));
 
-const shapData = [
+// Static fallback used when the backend is offline
+const STATIC_SHAP = [
   { name: "NDVI", value: -0.34, fill: "#1D9E75" },
   { name: "Building density", value: 0.28, fill: "#F97316" },
   { name: "Albedo", value: -0.22, fill: "#1D9E75" },
@@ -49,6 +52,36 @@ export const Route = createFileRoute("/app/analysis")({
 function AnalysisPage() {
   const [activeTab, setActiveTab] = useState<(typeof tabLabels)[number]>(tabLabels[0]);
 
+  const { data: driversData, isLoading: driversLoading, isError: driversError } = useQuery({
+    queryKey: ["drivers"],
+    queryFn: getDrivers,
+    retry: 1,
+    staleTime: 60_000,
+  });
+
+  // Build chart data from API if available, else fall back to static data
+  const shapData = driversData
+    ? driversData.feature_names.map((name, i) => {
+        const val = driversData.mean_abs_shap[i];
+        // Use sign from static data where name matches, else positive = heating
+        const staticMatch = STATIC_SHAP.find(
+          (s) => s.name.toLowerCase() === name.toLowerCase(),
+        );
+        const signed = staticMatch ? Math.sign(staticMatch.value) * val : val;
+        return {
+          name,
+          value: Number(signed.toFixed(4)),
+          fill: signed < 0 ? "#1D9E75" : "#F97316",
+        };
+      })
+    : STATIC_SHAP;
+
+  // Top-3 driver text lines
+  const insightLines: readonly string[] = driversData?.top_3_drivers.map(
+    (d, i) =>
+      `[${i + 1}] ${d.feature}: mean |SHAP| = ${d.mean_abs_shap_value.toFixed(3)}°C average impact on LST`,
+  ) ?? insights;
+
   return (
     <div className="px-8 py-8">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -77,15 +110,28 @@ function AnalysisPage() {
           <p className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
             Teal bars indicate cooling influence; orange bars indicate heating influence.
           </p>
-          <div className="mt-6 h-[280px]">
-            <Suspense fallback={<ChartFallback label="Loading SHAP chart" />}>
-              <ShapBarChart data={shapData} />
-            </Suspense>
+        <div className="mt-6 h-[280px]">
+            {driversLoading ? (
+              <div className="flex h-full animate-pulse items-center justify-center bg-[#0a0a0a] font-mono text-[10px] uppercase text-[#6b6b6b]">
+                LOADING SHAP DATA...
+              </div>
+            ) : driversError ? (
+              <div className="flex h-full flex-col items-center justify-center gap-2 bg-[#0a0a0a]">
+                <div className="font-mono text-[10px] text-yellow-500">BACKEND OFFLINE — SHOWING DEMO DATA</div>
+                <Suspense fallback={<ChartFallback label="Loading SHAP chart" />}>
+                  <ShapBarChart data={shapData as { name: string; value: number; fill: string }[]} />
+                </Suspense>
+              </div>
+            ) : (
+              <Suspense fallback={<ChartFallback label="Loading SHAP chart" />}>
+                <ShapBarChart data={shapData as { name: string; value: number; fill: string }[]} />
+              </Suspense>
+            )}
           </div>
 
           <div className="mt-6 space-y-3">
-            {insights.map((insight, idx) => (
-              <div key={insight} className="flex gap-3 border-t border-[#1a1a1a] py-4">
+            {insightLines.map((insight, idx) => (
+              <div key={idx} className="flex gap-3 border-t border-[#1a1a1a] py-4">
                 <div className="font-mono text-[10px] text-[#F97316]">0{idx + 1}</div>
                 <div className="font-sans text-[13px] leading-[1.7] text-[#a0a0a0]">{insight}</div>
               </div>

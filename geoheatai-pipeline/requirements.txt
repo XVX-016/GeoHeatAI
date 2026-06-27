@@ -1,6 +1,8 @@
 earthengine-api>=0.1.400
 fastapi
 geopandas>=0.14.0
+google-api-python-client
+google-auth-oauthlib
 h5py>=3.10.0
 lightgbm
 numpy>=1.26.0
@@ -13,6 +15,7 @@ scikit-learn>=1.4.0
 shap
 shapely>=2.0.0
 torch
+tqdm
 torchvision
 uvicorn[standard]
 xgboost

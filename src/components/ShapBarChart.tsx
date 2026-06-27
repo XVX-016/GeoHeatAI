@@ -15,7 +15,7 @@ type ShapDatum = {
   fill: string;
 };
 
-export default function ShapBarChart({ data }: { data: readonly ShapDatum[] }) {
+export default function ShapBarChart({ data }: { data: ShapDatum[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <BarChart layout="vertical" data={data} margin={{ top: 12, right: 12, bottom: 12, left: 8 }}>

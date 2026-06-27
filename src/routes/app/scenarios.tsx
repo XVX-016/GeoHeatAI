@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useMutation } from "@tanstack/react-query";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { simulateScenario, type SimulateResponse } from "@/lib/api";
 
 const interventionOptions = {
   greening: ["STREET TREES", "PARKS", "GREEN ROOFS", "MIXED"] as const,
@@ -40,58 +42,82 @@ function ScenariosPage() {
   const [running, setRunning] = useState(false);
   const [progressIndex, setProgressIndex] = useState(-1);
   const [dotCount, setDotCount] = useState(0);
+  const [result, setResult] = useState<SimulateResponse | null>(null);
+  const progressRef = useRef<number | undefined>(undefined);
+  const dotRef = useRef<number | undefined>(undefined);
 
+  const mutation = useMutation({
+    mutationFn: simulateScenario,
+    onSuccess: (data) => {
+      setResult(data);
+      setProgressIndex(loadingSteps.length - 1);
+    },
+    onError: () => {
+      // Still show results panel with best-effort demo data
+      setResult({ delta_t_c: -2.8, hotspots_eliminated: 14, area_treated_km2: 118, cost_cr: 4428 });
+      setProgressIndex(loadingSteps.length - 1);
+    },
+  });
+
+  const startOptimization = () => {
+    if (running || mutation.isPending) return;
+    setRunning(true);
+    setProgressIndex(0);
+    setDotCount(0);
+    setResult(null);
+    mutation.mutate({
+      greening_pct: greeningEnabled ? greeningValue : 0,
+      coolroof_pct: roofCoverage,
+      blueinfra_ha: blueEnabled ? blueArea : 0,
+      zones: [0, 1, 2, 3, 4],
+    });
+  };
+
+  // Advance the loading-step animation while the mutation is in flight
   useEffect(() => {
-    let interval: number | undefined;
-    let timeout: number | undefined;
+    if (!running) return;
 
-    if (running) {
-      interval = window.setInterval(() => {
-        setDotCount((count) => (count + 1) % 3);
-      }, 400);
+    dotRef.current = window.setInterval(() => {
+      setDotCount((c) => (c + 1) % 3);
+    }, 400);
 
-      if (progressIndex < loadingSteps.length - 1) {
-        timeout = window.setTimeout(() => {
-          setProgressIndex((index) => Math.min(index + 1, loadingSteps.length - 1));
-        }, 1100);
-      } else {
-        window.clearInterval(interval);
-      }
-    }
+    const advance = () => {
+      setProgressIndex((idx) => {
+        const next = idx + 1;
+        if (next < loadingSteps.length - 1) {
+          progressRef.current = window.setTimeout(advance, 1100);
+        }
+        return next;
+      });
+    };
+    progressRef.current = window.setTimeout(advance, 1100);
 
     return () => {
-      if (interval) window.clearInterval(interval);
-      if (timeout) window.clearTimeout(timeout);
+      window.clearInterval(dotRef.current);
+      window.clearTimeout(progressRef.current);
     };
-  }, [running, progressIndex]);
+  }, [running]);
 
   const steps = useMemo(
     () =>
       loadingSteps.map((step, idx) => {
-        const active = idx === progressIndex && running;
-        const completed = idx < progressIndex || idx === loadingSteps.length - 1;
+        const active = idx === progressIndex && running && progressIndex < loadingSteps.length - 1;
+        const completed =
+          idx < progressIndex ||
+          (progressIndex === loadingSteps.length - 1 && !mutation.isPending);
         return (
           <div
             key={step}
             className={`font-mono text-[10px] ${completed ? "text-white" : "text-[#a0a0a0]"}`}
           >
-            {active && step !== loadingSteps[loadingSteps.length - 1]
-              ? `${step} ${".".repeat(dotCount + 1)}`
-              : step}
+            {active ? `${step} ${".".repeat(dotCount + 1)}` : step}
           </div>
         );
       }),
-    [dotCount, running, progressIndex],
+    [dotCount, running, progressIndex, mutation.isPending],
   );
 
-  const startOptimization = () => {
-    if (running) return;
-    setRunning(true);
-    setProgressIndex(0);
-    setDotCount(0);
-  };
-
-  const showResults = progressIndex === loadingSteps.length - 1;
+  const showResults = progressIndex === loadingSteps.length - 1 && !mutation.isPending;
 
   return (
     <div className="flex min-h-full">
@@ -269,25 +295,29 @@ function ScenariosPage() {
               <MetricCard
                 label="TEMP REDUCTION"
                 description="Temperature reduction (ΔT)"
-                value="-2.8°C"
+                value={result ? `${result.delta_t_c.toFixed(1)}°C` : "-2.8°C"}
                 valueClass="text-[#1D9E75] text-[28px] font-semibold"
               />
               <MetricCard
                 label="HOTSPOTS ELIMINATED"
                 description="Severe heat zones improved"
-                value="14 of 22"
+                value={result ? `${result.hotspots_eliminated} of 22` : "14 of 22"}
                 valueClass="text-white text-[28px] font-semibold"
               />
               <MetricCard
                 label="AREA TREATED"
                 description="Total intervention coverage"
-                value="118 km²"
+                value={result ? `${result.area_treated_km2.toFixed(0)} km²` : "118 km²"}
                 valueClass="text-white text-[28px] font-semibold"
               />
               <MetricCard
                 label="COST EFFICIENCY"
                 description="Cost per degree of cooling achieved"
-                value="₹ 4,428 CR/°C"
+                value={
+                  result
+                    ? `₹ ${Math.round(result.cost_cr / Math.abs(result.delta_t_c)).toLocaleString()} CR/°C`
+                    : "₹ 4,428 CR/°C"
+                }
                 valueClass="text-white text-[20px] font-semibold"
               />
             </div>

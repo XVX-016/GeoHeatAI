@@ -1,5 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { BarChart3, Download, GitBranch, Layers, SlidersHorizontal } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getHealth } from "@/lib/api";
 
 const APP_NAV = [
   { label: "MAP", to: "/app/map", Icon: Layers },
@@ -18,6 +20,16 @@ function AppShell() {
     select: (state) => state.location.pathname,
   });
   const currentPage = APP_NAV.find((item) => pathname === item.to)?.label || "MAP";
+
+  // Poll health every 10 s so the indicator auto-recovers when the backend starts
+  const { data: health, isError } = useQuery({
+    queryKey: ["health"],
+    queryFn: getHealth,
+    retry: false,
+    refetchInterval: 10_000,
+  });
+
+  const pipelineReady = !isError && health?.status === "ok";
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -65,8 +77,13 @@ function AppShell() {
         <header className="flex h-12 items-center justify-between border-b border-[#1a1a1a] px-6">
           <div className="font-mono text-[11px] uppercase text-[#6b6b6b]">{currentPage}</div>
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase text-white">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
-            PIPELINE READY
+            <span
+              className={`h-2 w-2 rounded-full transition-colors ${
+                pipelineReady ? "bg-emerald-400" : "bg-yellow-400"
+              }`}
+              aria-hidden
+            />
+            {pipelineReady ? "PIPELINE READY" : "BACKEND OFFLINE"}
           </div>
         </header>
 

@@ -1,7 +1,9 @@
 import { lazy, Suspense, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { Slider } from "@/components/ui/slider";
 import type { ParetoPoint } from "@/components/ParetoScatterChart";
+import { getPareto, getRecommended } from "@/lib/api";
 
 const ParetoScatterChart = lazy(() => import("@/components/ParetoScatterChart"));
 
@@ -15,7 +17,7 @@ type ScenarioRow = {
   equity: string;
 };
 
-const SAMPLE_ROWS: ScenarioRow[] = [
+const SAMPLE_ROWS_FALLBACK = [
   { id: "P-01", greening: 22, roof: 68, blue: 180, dt: "-2.8°C", cost: "₹ 4,428", equity: "0.82" },
   { id: "P-02", greening: 18, roof: 60, blue: 120, dt: "-2.3°C", cost: "₹ 3,920", equity: "0.79" },
   { id: "P-03", greening: 26, roof: 72, blue: 200, dt: "-3.0°C", cost: "₹ 5,120", equity: "0.85" },
@@ -30,7 +32,7 @@ export const Route = createFileRoute("/app/pareto")({
   component: ParetoPage,
 });
 
-function randomPareto(n = 40): ParetoPoint[] {
+function randomParetoFallback(n = 40): ParetoPoint[] {
   const points: ParetoPoint[] = [];
   for (let i = 0; i < n; i++) {
     const cost = Math.round(100 + Math.random() * 4900);
@@ -45,12 +47,60 @@ function randomPareto(n = 40): ParetoPoint[] {
 function ParetoPage() {
   const [weights, setWeights] = useState({ cost: 0.33, temp: 0.33, equity: 0.34 });
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const data = useMemo(() => randomPareto(40), []);
-  const recommended = useMemo(() => data[8], [data]);
+
+  const { data: paretoRaw, isLoading: paretoLoading, isError: paretoError } = useQuery({
+    queryKey: ["pareto"],
+    queryFn: getPareto,
+    retry: 1,
+    staleTime: 60_000,
+  });
+
+  const { data: recommendedRaw } = useQuery({
+    queryKey: ["recommended"],
+    queryFn: getRecommended,
+    retry: 1,
+    staleTime: 60_000,
+  });
+
+  // Map API shape → ParetoPoint shape for the chart
+  const fallbackData = useMemo(() => randomParetoFallback(40), []);
+  const data: ParetoPoint[] = useMemo(() => {
+    if (!paretoRaw) return fallbackData;
+    return paretoRaw.map((s) => ({
+      id: s.solution_id + 1,
+      cost: Math.round(s.cost_cr),
+      dt: Number(s.delta_t_c.toFixed(2)),
+      equity: Number(s.equity_score.toFixed(2)),
+    }));
+  }, [paretoRaw, fallbackData]);
+
+  const recommended = useMemo(() => {
+    if (recommendedRaw) {
+      return data.find((p) => p.id === recommendedRaw.solution_id + 1) ?? data[8];
+    }
+    return data[8];
+  }, [data, recommendedRaw]);
+
   const selectedPoint = useMemo(
     () => data.find((point) => point.id === selectedId),
     [data, selectedId],
   );
+
+  // Build table rows from API data (show first 8)
+  const tableRows: ScenarioRow[] = useMemo(() => {
+    if (!paretoRaw) return SAMPLE_ROWS_FALLBACK as ScenarioRow[];
+    return paretoRaw.slice(0, 8).map((s) => ({
+      id: `P-${String(s.solution_id + 1).padStart(2, "0")}`,
+      greening: Math.round(s.greening_pct),
+      roof: Math.round(s.coolroof_pct),
+      blue: Math.round(s.blueinfra_ha),
+      dt: `${s.delta_t_c >= 0 ? "+" : ""}${s.delta_t_c.toFixed(1)}°C`,
+      cost: `₹ ${Math.round(s.cost_cr).toLocaleString()}`,
+      equity: s.equity_score.toFixed(2),
+    }));
+  }, [paretoRaw]);
+
+  const paretoCount = paretoRaw?.length ?? 47;
 
   const handlePointClick = (id: number) => {
     setSelectedId(id);
@@ -71,7 +121,7 @@ function ParetoPage() {
 
         <div className="flex flex-wrap gap-3">
           <SummaryBadge label="SOLUTIONS" value="2,400" description="Candidate plans tested" />
-          <SummaryBadge label="PARETO FRONT" value="47" description="Best tradeoff solutions" />
+          <SummaryBadge label="PARETO FRONT" value={String(paretoCount)} description={paretoError ? "DEMO DATA" : "Best tradeoff solutions"} />
           <SummaryBadge label="OBJECTIVES" value="3" description="Cost, cooling, equity" />
         </div>
       </div>
@@ -84,14 +134,20 @@ function ParetoPage() {
           NSGA-III searches for plans where no objective can improve without compromising another.
         </p>
         <div className="relative mt-6 h-[320px]">
-          <Suspense fallback={<ChartFallback label="Loading Pareto chart" />}>
-            <ParetoScatterChart
-              data={data}
-              recommended={recommended}
-              selectedPoint={selectedPoint}
-              onPointClick={handlePointClick}
-            />
-          </Suspense>
+          {paretoLoading ? (
+            <div className="flex h-full animate-pulse items-center justify-center bg-[#0a0a0a] font-mono text-[10px] uppercase text-[#6b6b6b]">
+              LOADING PARETO DATA...
+            </div>
+          ) : (
+            <Suspense fallback={<ChartFallback label="Loading Pareto chart" />}>
+              <ParetoScatterChart
+                data={data}
+                recommended={recommended}
+                selectedPoint={selectedPoint}
+                onPointClick={handlePointClick}
+              />
+            </Suspense>
+          )}
 
           {recommended && (
             <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
@@ -143,11 +199,13 @@ function ParetoPage() {
                 </tr>
               </thead>
               <tbody className="font-mono text-[11px] text-[#a0a0a0]">
-                {SAMPLE_ROWS.map((row, index) => (
+                {tableRows.map((row, index) => (
                   <tr
                     key={row.id}
                     className={`cursor-pointer border-b border-[#1a1a1a] transition-colors hover:bg-[#0a0a0a] ${
-                      index === 2 ? "border-l-2 border-[#F97316] bg-[#F97316]/5 text-white" : ""
+                      recommended && data[index]?.id === recommended.id
+                        ? "border-l-2 border-[#F97316] bg-[#F97316]/5 text-white"
+                        : ""
                     }`}
                     onClick={() => handlePointClick(index + 1)}
                   >

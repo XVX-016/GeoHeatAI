@@ -78,7 +78,10 @@ def build_scene_feature_stack(
         crs=landsat_image.select(0).projection(), scale=TARGET_RESOLUTION_M
     )
 
-    return with_era5.addBands(static_reprojected)
+    # Cast all bands to Float32 to prevent GEE export type-mismatch errors
+    # (GHSL layers are Byte, Landsat/ERA5 are Float64 — GeoTIFF needs uniform types)
+    combined = with_era5.addBands(static_reprojected)
+    return combined.toFloat()
 
 
 def export_scene_to_drive(
@@ -93,7 +96,7 @@ def export_scene_to_drive(
     region = ee.Geometry.Rectangle(bbox)
 
     task = ee.batch.Export.image.toDrive(
-        image=feature_stack.clip(region),
+        image=feature_stack.toFloat().clip(region),
         description=f"geoheatai_{city}_{scene_id}",
         folder=EXPORT_FOLDER_DRIVE,
         fileNamePrefix=f"geoheatai_{city}_{scene_id}",

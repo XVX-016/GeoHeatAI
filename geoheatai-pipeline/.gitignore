@@ -1,5 +1,7 @@
 # Secrets — never commit
 config/gee-service-account.json
+config/drive_token.json
+config/drive_oauth_client.json
 *.json.key
 .env
 

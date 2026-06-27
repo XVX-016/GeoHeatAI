@@ -35,8 +35,16 @@ def validate_project_id() -> None:
 
 
 def init_with_service_account() -> None:
-    """Authenticate using a downloaded service account JSON key."""
+    """Authenticate using user credentials or fall back to service account JSON key."""
     validate_project_id()
+
+    try:
+        # Try initializing with persistent user credentials first to avoid Service Account quota issues
+        ee.Initialize(project=GEE_PROJECT_ID)
+        print("Successfully initialized Earth Engine with user credentials.")
+        return
+    except Exception as e:
+        print(f"Could not initialize with user credentials ({e}). Falling back to service account key...")
 
     if not SERVICE_ACCOUNT_KEY_PATH.exists():
         raise FileNotFoundError(

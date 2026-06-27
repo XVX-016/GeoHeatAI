@@ -8,6 +8,8 @@ loss term representing the surface energy balance (Bowen ratio proxy constraint)
 
 import os
 import sys
+import json
+from pathlib import Path
 import h5py
 import numpy as np
 import torch
@@ -363,6 +365,18 @@ def main():
     print(f"\nFinal Validation metrics (PINN U-Net):")
     print(f"  R²   = {r2:.4f}")
     print(f"  RMSE = {rmse:.4f}°C")
+
+    # Save Metrics for Pipeline Runner
+    pinn_metrics = {
+        "val_r2": float(r2),
+        "val_rmse": float(rmse)
+    }
+    metrics_path = DATA_PROCESSED / "pinn_metrics.json"
+    with open(metrics_path, "w") as f:
+        json.dump(pinn_metrics, f, indent=2)
+    print(f"Saved PINN metrics to {metrics_path}")
+
+    return pinn_metrics
 
 if __name__ == "__main__":
     main()
