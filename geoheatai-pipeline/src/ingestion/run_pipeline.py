@@ -22,6 +22,7 @@ batch and check back later.
 
 import sys
 import time
+import re
 from pathlib import Path
 
 import ee
@@ -195,13 +196,21 @@ def resubmit_failed_tasks(city: str = DEFAULT_CITY):
         # Extract scene_id (e.g. from "geoheatai_delhi_ncr_1_LC08_146041_20190530")
         scene_id = desc.replace(f"geoheatai_{city}_", "")
         
+        # Clean scene_id for the GEE image lookup path (removes collection merge index prefix)
+        # e.g., "2_LC09_146041_20240620" -> "LC09_146041_20240620"
+        match = re.search(r'(LC0[89]_[0-9]+_[0-9]+)', scene_id)
+        if not match:
+            print(f"  [{i+1}/{len(failed_tasks)}] Skipping {scene_id}: cannot parse Landsat scene ID format")
+            continue
+        clean_scene_id = match.group(1)
+        
         # Resolve instrument: Landsat 8 or Landsat 9
-        if "LC08" in scene_id:
-            img_path = f"LANDSAT/LC08/C02/T1_L2/{scene_id}"
-        elif "LC09" in scene_id:
-            img_path = f"LANDSAT/LC09/C02/T1_L2/{scene_id}"
+        if "LC08" in clean_scene_id:
+            img_path = f"LANDSAT/LC08/C02/T1_L2/{clean_scene_id}"
+        elif "LC09" in clean_scene_id:
+            img_path = f"LANDSAT/LC09/C02/T1_L2/{clean_scene_id}"
         else:
-            print(f"  [{i+1}/{len(failed_tasks)}] Skipping {scene_id}: unknown Landsat instrument")
+            print(f"  [{i+1}/{len(failed_tasks)}] Skipping {clean_scene_id}: unknown Landsat instrument")
             continue
             
         print(f"  [{i+1}/{len(failed_tasks)}] Resubmitting {scene_id} ({img_path})...")
