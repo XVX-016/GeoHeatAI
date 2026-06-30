@@ -78,8 +78,26 @@ def main():
         tif_files = list(DATA_RAW.glob("**/*.tif"))
 
     if not tif_files:
-        print(f"[{get_timestamp()}] [ERROR] No GeoTIFF files found in {DATA_RAW}.")
-        print("Please download your Google Drive exports to data/raw/ before running the pipeline.")
+        print(f"[{get_timestamp()}] No local scenes found — starting direct GEE download...")
+        try:
+            # Initialize GEE auth first
+            from src.utils.gee_auth import init_with_service_account
+            init_with_service_account()
+            
+            # Load download module dynamically and execute
+            download_local = importlib.import_module("src.ingestion.download_local")
+            download_local.download_all_scenes(out_dir=DATA_RAW, resume=True)
+            
+            # Re-read raw files list
+            tif_files = list(DATA_RAW.glob("geoheatai_*.tif"))
+            if not tif_files:
+                tif_files = list(DATA_RAW.glob("**/*.tif"))
+        except Exception as e:
+            print(f"[{get_timestamp()}] [ERROR] Direct GEE download failed: {e}")
+            sys.exit(1)
+
+    if not tif_files:
+        print(f"[{get_timestamp()}] [ERROR] Still no GeoTIFF files found in {DATA_RAW} after download attempt.")
         sys.exit(1)
 
     print(f"[{get_timestamp()}] Found {len(tif_files)} GeoTIFF files in {DATA_RAW}.")

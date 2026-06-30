@@ -15,6 +15,13 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATA_RAW = PROJECT_ROOT / "data" / "raw"
 DATA_PROCESSED = PROJECT_ROOT / "data" / "processed"
+TILES_TEMP_DIR = PROJECT_ROOT / "data" / "tiles_temp"
+
+# Ensure directories exist
+DATA_RAW.mkdir(parents=True, exist_ok=True)
+DATA_PROCESSED.mkdir(parents=True, exist_ok=True)
+TILES_TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
 SERVICE_ACCOUNT_KEY_PATH = Path(
     os.getenv("GEE_SERVICE_ACCOUNT_KEY", PROJECT_ROOT / "config" / "gee-service-account.json")
 ).expanduser()

@@ -4,31 +4,19 @@ This documentation covers GCS exports, data tiling, machine learning baseline mo
 
 ---
 
-## 0. GCS Export Setup (replaces Google Drive)
-To resolve Google Drive storage limit issues, scene exports are sent to Google Cloud Storage (GCS).
+## 0. Direct Local Download (No Cloud Storage Required)
+To bypass Google Drive quota limits and avoid GCP billing account requirements, scenes can be downloaded directly to local disk.
 
-1. **Install and Authenticate gcloud CLI**:
-   - Install the gcloud CLI: https://cloud.google.com/sdk/docs/install
-   - Log in and configure application default credentials:
-     ```bash
-     gcloud auth login
-     gcloud auth application-default login
-     gcloud config set project geoheatai
-     ```
-2. **Initialize Bucket & Permissions**:
+1. **Run Direct Local Downloader**:
+   This script queries GEE, splits the Delhi NCR bounding box into small tiles, downloads them, and merges them locally into standard GeoTIFFs:
    ```bash
-   python setup_gcs.py
+   python src/ingestion/download_local.py
    ```
-3. **Resubmit Failed Tasks to GCS**:
-   ```bash
-   python src/ingestion/run_pipeline.py --resubmit-failed
-   ```
-4. **Poll and Download GeoTIFFs**:
-   ```bash
-   python src/utils/download_from_gcs.py
-   ```
-5. **Run the Complete Pipeline**:
-   Once all files are downloaded, execute the full pipeline runner:
+   - **Details**: Downloads 133 scenes (~8-15 GB total to local disk) directly to `data/raw/`.
+   - **Estimated Time**: 2-4 hours depending on GEE rate limiting and your network connection.
+   - **Resume Safe**: If the process is interrupted, re-running skips already completed scenes.
+2. **Run the Complete Pipeline**:
+   Alternatively, you can just run the full pipeline runner, which will automatically trigger `download_local.py` if no local GeoTIFFs are detected in `data/raw/`:
    ```bash
    python src/utils/pipeline_runner.py
    ```
