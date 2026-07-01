@@ -2,21 +2,40 @@
 config/gee-service-account.json
 config/drive_token.json
 config/drive_oauth_client.json
+config/gcs_token.json
 *.json.key
 .env
+.env.local
 
-# Data
+# Data — raw GeoTIFFs, processed outputs, temporary tiles
 data/raw/*
 data/processed/*
+data/tiles_temp/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
+!data/tiles_temp/.gitkeep
+
+# Trained model artifacts
+*.pt
+*.joblib
+*.h5
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
 .venv/
 venv/
 *.egg-info/
+dist/
+build/
 
 # Earth Engine local credential cache (if using interactive auth)
 .config/earthengine/
+
+# GCP application default credentials cache
+application_default_credentials.json
+
+# OS / editor
+.DS_Store
+Thumbs.db

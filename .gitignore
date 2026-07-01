@@ -14,7 +14,11 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
+
+# Environment
 *.local
+.env
+.env.local
 
 # Wrangler / Cloudflare
 .wrangler/
@@ -25,8 +29,20 @@ dist-ssr
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Pipeline data (also covered in geoheatai-pipeline/.gitignore)
+geoheatai-pipeline/data/raw/*
+geoheatai-pipeline/data/processed/*
+geoheatai-pipeline/data/tiles_temp/*
+
+# Secrets
+geoheatai-pipeline/config/gee-service-account.json
+geoheatai-pipeline/config/drive_token.json
+geoheatai-pipeline/config/drive_oauth_client.json
+geoheatai-pipeline/config/gcs_token.json

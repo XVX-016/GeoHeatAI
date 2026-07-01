@@ -109,14 +109,8 @@ def download_scene_tile(
         resp = requests.get(url, stream=True, timeout=300)
         resp.raise_for_status()
         
-        # Extract GeoTIFF from downloaded zip
-        z = zipfile.ZipFile(io.BytesIO(resp.content))
-        tif_names = [n for n in z.namelist() if n.endswith('.tif')]
-        if not tif_names:
-            print(f"Warning: No .tif file inside GEE zip response for tile {tile_idx} of {scene_id}")
-            return None
-            
-        dest_path.write_bytes(z.read(tif_names[0]))
+        # GEE returns the raw multi-band GeoTIFF directly, not a zip
+        dest_path.write_bytes(resp.content)
         return dest_path
     except Exception as e:
         print(f"Warning: Failed to download tile {tile_idx} for scene {scene_id}: {e}")
