@@ -1,61 +1,50 @@
 /**
  * GeoHeatAI — typed fetch client for the FastAPI backend at localhost:8000.
- * All functions are plain async functions; wrap them in useQuery/useMutation
- * in the consuming components.
  */
 
-const BASE_URL = (typeof process !== "undefined" ? process.env.NEXT_PUBLIC_API_URL : undefined) || "http://localhost:8000";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
+    ...options,
+    headers: { "Content-Type": "application/json", ...(options?.headers as Record<string, string> | undefined) },
   });
+
   if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`API ${res.status}: ${text}`);
+    const msg = await res.text().catch(() => res.statusText);
+    throw new Error(`API ${path} failed (${res.status}): ${msg}`);
   }
+
   return res.json() as Promise<T>;
 }
-
-// ─── Response shapes ──────────────────────────────────────────────────────────
 
 export interface HealthResponse {
   status: string;
   model: string;
   city: string;
-  ml_model_status: string;
-}
-
-export interface Top3Driver {
-  feature: string;
-  mean_abs_shap_value: number;
 }
 
 export interface DriversResponse {
-  feature_names: string[];
-  mean_abs_shap: number[];
-  top_3_drivers: Top3Driver[];
+  features: string[];
+  shap_values: number[];
+  top_3: string[];
 }
 
 export interface ParetoSolution {
-  solution_id: number;
+  solution_id: string;
   greening_pct: number;
   coolroof_pct: number;
   blueinfra_ha: number;
   delta_t_c: number;
   cost_cr: number;
   equity_score: number;
-  zone_allocations?: number[][];
 }
 
-export interface RecommendedIntervention extends ParetoSolution {}
-
-export interface SimulateParams {
+export interface SimulateRequest {
   greening_pct: number;
   coolroof_pct: number;
   blueinfra_ha: number;
-  zones: number[];
+  zones: string[];
 }
 
 export interface SimulateResponse {
@@ -65,22 +54,95 @@ export interface SimulateResponse {
   cost_cr: number;
 }
 
-// ─── API functions ─────────────────────────────────────────────────────────────
+function normalizeDrivers(payload: any): DriversResponse {
+  const featureNames = Array.isArray(payload?.feature_names) ? payload.feature_names : [];
+  const shapValues = Array.isArray(payload?.mean_abs_shap) ? payload.mean_abs_shap : [];
+  const top3 = Array.isArray(payload?.top_3_drivers)
+    ? payload.top_3_drivers.map((item: any) => item?.feature ?? "")
+    : [];
 
-export const getHealth = (): Promise<HealthResponse> =>
-  apiFetch<HealthResponse>("/api/health");
+  return {
+    features: featureNames,
+    shap_values: shapValues,
+    top_3: top3,
+  };
+}
 
-export const getDrivers = (): Promise<DriversResponse> =>
-  apiFetch<DriversResponse>("/api/drivers");
+function normalizePareto(payload: any[]): ParetoSolution[] {
+  return (payload ?? []).map((solution: any) => ({
+    solution_id: String(solution?.solution_id ?? ""),
+    greening_pct: Number(solution?.greening_pct ?? 0),
+    coolroof_pct: Number(solution?.coolroof_pct ?? 0),
+    blueinfra_ha: Number(solution?.blueinfra_ha ?? 0),
+    delta_t_c: Number(solution?.delta_t_c ?? 0),
+    cost_cr: Number(solution?.cost_cr ?? 0),
+    equity_score: Number(solution?.equity_score ?? 0),
+  }));
+}
 
-export const getPareto = (): Promise<ParetoSolution[]> =>
-  apiFetch<ParetoSolution[]>("/api/pareto");
+function normalizeRecommended(payload: any): ParetoSolution {
+  return {
+    solution_id: String(payload?.solution_id ?? ""),
+    greening_pct: Number(payload?.greening_pct ?? 0),
+    coolroof_pct: Number(payload?.coolroof_pct ?? 0),
+    blueinfra_ha: Number(payload?.blueinfra_ha ?? 0),
+    delta_t_c: Number(payload?.delta_t_c ?? 0),
+    cost_cr: Number(payload?.cost_cr ?? 0),
+    equity_score: Number(payload?.equity_score ?? 0),
+  };
+}
 
-export const getRecommended = (): Promise<RecommendedIntervention> =>
-  apiFetch<RecommendedIntervention>("/api/scenarios/recommended");
+function normalizeSimulate(payload: any): SimulateResponse {
+  return {
+    delta_t_c: Number(payload?.delta_t_c ?? 0),
+    hotspots_eliminated: Number(payload?.hotspots_eliminated ?? 0),
+    area_treated_km2: Number(payload?.area_treated_km2 ?? 0),
+    cost_cr: Number(payload?.cost_cr ?? 0),
+  };
+}
 
-export const simulateScenario = (params: SimulateParams): Promise<SimulateResponse> =>
-  apiFetch<SimulateResponse>("/api/scenarios/simulate", {
-    method: "POST",
-    body: JSON.stringify(params),
-  });
+function normalizeZones(zones: string[]): number[] {
+  if (zones.includes("all")) return Array.from({ length: 50 }, (_, index) => index);
+  return zones.map((zone) => Number(zone));
+}
+
+export const api = {
+  health: async () => {
+    const payload = await apiFetch<any>("/api/health");
+    return {
+      status: payload.status ?? "ok",
+      model: payload.model ?? "Unknown",
+      city: payload.city ?? "Delhi NCR",
+    } satisfies HealthResponse;
+  },
+  drivers: async () => {
+    const payload = await apiFetch<any>("/api/drivers");
+    return normalizeDrivers(payload);
+  },
+  pareto: async () => {
+    const payload = await apiFetch<any[]>("/api/pareto");
+    return normalizePareto(payload);
+  },
+  recommended: async () => {
+    const payload = await apiFetch<any>("/api/scenarios/recommended");
+    return normalizeRecommended(payload);
+  },
+  simulate: async (params: SimulateRequest) => {
+    const payload = await apiFetch<any>("/api/scenarios/simulate", {
+      method: "POST",
+      body: JSON.stringify({
+        greening_pct: params.greening_pct,
+        coolroof_pct: params.coolroof_pct,
+        blueinfra_ha: params.blueinfra_ha,
+        zones: normalizeZones(params.zones),
+      }),
+    });
+    return normalizeSimulate(payload);
+  },
+} as const;
+
+export const getHealth = api.health;
+export const getDrivers = api.drivers;
+export const getPareto = api.pareto;
+export const getRecommended = api.recommended;
+export const simulateScenario = api.simulate;

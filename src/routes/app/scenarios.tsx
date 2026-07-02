@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation } from "@tanstack/react-query";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { simulateScenario, type SimulateResponse } from "@/lib/api";
+import { api, type SimulateResponse } from "@/lib/api";
 
 const interventionOptions = {
   greening: ["STREET TREES", "PARKS", "GREEN ROOFS", "MIXED"] as const,
@@ -39,43 +39,43 @@ function ScenariosPage() {
   const [blueArea, setBlueArea] = useState(0);
   const [blueType, setBlueType] = useState<(typeof interventionOptions.blue)[number]>("DRAINAGE");
 
-  const [running, setRunning] = useState(false);
   const [progressIndex, setProgressIndex] = useState(-1);
   const [dotCount, setDotCount] = useState(0);
-  const [result, setResult] = useState<SimulateResponse | null>(null);
+  const [simResult, setSimResult] = useState<SimulateResponse | null>(null);
+  const [runComplete, setRunComplete] = useState(false);
   const progressRef = useRef<number | undefined>(undefined);
   const dotRef = useRef<number | undefined>(undefined);
 
-  const mutation = useMutation({
-    mutationFn: simulateScenario,
+  const simulateMutation = useMutation({
+    mutationFn: api.simulate,
     onSuccess: (data) => {
-      setResult(data);
+      setSimResult(data);
+      setRunComplete(true);
       setProgressIndex(loadingSteps.length - 1);
     },
     onError: () => {
-      // Still show results panel with best-effort demo data
-      setResult({ delta_t_c: -2.8, hotspots_eliminated: 14, area_treated_km2: 118, cost_cr: 4428 });
+      setSimResult({ delta_t_c: -2.8, hotspots_eliminated: 14, area_treated_km2: 118, cost_cr: 4428 });
+      setRunComplete(true);
       setProgressIndex(loadingSteps.length - 1);
     },
   });
 
   const startOptimization = () => {
-    if (running || mutation.isPending) return;
-    setRunning(true);
+    if (simulateMutation.isPending) return;
     setProgressIndex(0);
     setDotCount(0);
-    setResult(null);
-    mutation.mutate({
+    setSimResult(null);
+    setRunComplete(false);
+    simulateMutation.mutate({
       greening_pct: greeningEnabled ? greeningValue : 0,
-      coolroof_pct: roofCoverage,
+      coolroof_pct: Math.round(roofValue * 100),
       blueinfra_ha: blueEnabled ? blueArea : 0,
-      zones: [0, 1, 2, 3, 4],
+      zones: ["all"],
     });
   };
 
-  // Advance the loading-step animation while the mutation is in flight
   useEffect(() => {
-    if (!running) return;
+    if (!simulateMutation.isPending) return;
 
     dotRef.current = window.setInterval(() => {
       setDotCount((c) => (c + 1) % 3);
@@ -96,15 +96,15 @@ function ScenariosPage() {
       window.clearInterval(dotRef.current);
       window.clearTimeout(progressRef.current);
     };
-  }, [running]);
+  }, [simulateMutation.isPending]);
 
   const steps = useMemo(
     () =>
       loadingSteps.map((step, idx) => {
-        const active = idx === progressIndex && running && progressIndex < loadingSteps.length - 1;
+        const active = idx === progressIndex && simulateMutation.isPending && progressIndex < loadingSteps.length - 1;
         const completed =
           idx < progressIndex ||
-          (progressIndex === loadingSteps.length - 1 && !mutation.isPending);
+          (progressIndex === loadingSteps.length - 1 && !simulateMutation.isPending);
         return (
           <div
             key={step}
@@ -114,10 +114,10 @@ function ScenariosPage() {
           </div>
         );
       }),
-    [dotCount, running, progressIndex, mutation.isPending],
+    [dotCount, progressIndex, simulateMutation.isPending],
   );
 
-  const showResults = progressIndex === loadingSteps.length - 1 && !mutation.isPending;
+  const showResults = runComplete && !simulateMutation.isPending;
 
   return (
     <div className="flex min-h-full">
@@ -255,7 +255,7 @@ function ScenariosPage() {
           <div className="mt-3 font-mono text-[10px] text-[#1D9E75]">WITHIN AREA BUDGET</div>
         </div>
 
-        {running ? (
+        {simulateMutation.isPending ? (
           <div className="mt-6 space-y-2">{steps}</div>
         ) : (
           <button
@@ -295,27 +295,27 @@ function ScenariosPage() {
               <MetricCard
                 label="TEMP REDUCTION"
                 description="Temperature reduction (ΔT)"
-                value={result ? `${result.delta_t_c.toFixed(1)}°C` : "-2.8°C"}
+                value={simResult ? `${simResult.delta_t_c.toFixed(1)}°C` : "-2.8°C"}
                 valueClass="text-[#1D9E75] text-[28px] font-semibold"
               />
               <MetricCard
                 label="HOTSPOTS ELIMINATED"
                 description="Severe heat zones improved"
-                value={result ? `${result.hotspots_eliminated} of 22` : "14 of 22"}
+                value={simResult ? `${simResult.hotspots_eliminated} of 22` : "14 of 22"}
                 valueClass="text-white text-[28px] font-semibold"
               />
               <MetricCard
                 label="AREA TREATED"
                 description="Total intervention coverage"
-                value={result ? `${result.area_treated_km2.toFixed(0)} km²` : "118 km²"}
+                value={simResult ? `${simResult.area_treated_km2.toFixed(0)} km²` : "118 km²"}
                 valueClass="text-white text-[28px] font-semibold"
               />
               <MetricCard
                 label="COST EFFICIENCY"
                 description="Cost per degree of cooling achieved"
                 value={
-                  result
-                    ? `₹ ${Math.round(result.cost_cr / Math.abs(result.delta_t_c)).toLocaleString()} CR/°C`
+                  simResult
+                    ? `₹ ${Math.round(simResult.cost_cr / Math.abs(simResult.delta_t_c)).toLocaleString()} CR/°C`
                     : "₹ 4,428 CR/°C"
                 }
                 valueClass="text-white text-[20px] font-semibold"

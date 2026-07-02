@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Slider } from "@/components/ui/slider";
 import type { ParetoPoint } from "@/components/ParetoScatterChart";
-import { getPareto, getRecommended } from "@/lib/api";
+import { api } from "@/lib/api";
 
 const ParetoScatterChart = lazy(() => import("@/components/ParetoScatterChart"));
 
@@ -48,38 +48,37 @@ function ParetoPage() {
   const [weights, setWeights] = useState({ cost: 0.33, temp: 0.33, equity: 0.34 });
   const [selectedId, setSelectedId] = useState<number | null>(null);
 
-  const { data: paretoRaw, isLoading: paretoLoading, isError: paretoError } = useQuery({
+  const { data: paretoData, isLoading: paretoLoading, isError: paretoError } = useQuery({
     queryKey: ["pareto"],
-    queryFn: getPareto,
-    retry: 1,
-    staleTime: 60_000,
+    queryFn: api.pareto,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
-  const { data: recommendedRaw } = useQuery({
+  const { data: recommendedData } = useQuery({
     queryKey: ["recommended"],
-    queryFn: getRecommended,
-    retry: 1,
-    staleTime: 60_000,
+    queryFn: api.recommended,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Map API shape → ParetoPoint shape for the chart
   const fallbackData = useMemo(() => randomParetoFallback(40), []);
   const data: ParetoPoint[] = useMemo(() => {
-    if (!paretoRaw) return fallbackData;
-    return paretoRaw.map((s) => ({
-      id: s.solution_id + 1,
-      cost: Math.round(s.cost_cr),
-      dt: Number(s.delta_t_c.toFixed(2)),
-      equity: Number(s.equity_score.toFixed(2)),
+    if (!paretoData) return fallbackData;
+    return paretoData.map((solution) => ({
+      id: Number(solution.solution_id) + 1,
+      cost: Math.round(solution.cost_cr),
+      dt: Number(Math.abs(solution.delta_t_c).toFixed(2)),
+      equity: Number(solution.equity_score.toFixed(2)),
     }));
-  }, [paretoRaw, fallbackData]);
+  }, [paretoData, fallbackData]);
 
   const recommended = useMemo(() => {
-    if (recommendedRaw) {
-      return data.find((p) => p.id === recommendedRaw.solution_id + 1) ?? data[8];
+    if (recommendedData) {
+      return data.find((point) => point.id === Number(recommendedData.solution_id) + 1) ?? data[8];
     }
     return data[8];
-  }, [data, recommendedRaw]);
+  }, [data, recommendedData]);
 
   const selectedPoint = useMemo(
     () => data.find((point) => point.id === selectedId),
@@ -88,19 +87,19 @@ function ParetoPage() {
 
   // Build table rows from API data (show first 8)
   const tableRows: ScenarioRow[] = useMemo(() => {
-    if (!paretoRaw) return SAMPLE_ROWS_FALLBACK as ScenarioRow[];
-    return paretoRaw.slice(0, 8).map((s) => ({
-      id: `P-${String(s.solution_id + 1).padStart(2, "0")}`,
-      greening: Math.round(s.greening_pct),
-      roof: Math.round(s.coolroof_pct),
-      blue: Math.round(s.blueinfra_ha),
-      dt: `${s.delta_t_c >= 0 ? "+" : ""}${s.delta_t_c.toFixed(1)}°C`,
-      cost: `₹ ${Math.round(s.cost_cr).toLocaleString()}`,
-      equity: s.equity_score.toFixed(2),
+    if (!paretoData) return SAMPLE_ROWS_FALLBACK as ScenarioRow[];
+    return paretoData.slice(0, 8).map((solution) => ({
+      id: `P-${String(Number(solution.solution_id) + 1).padStart(2, "0")}`,
+      greening: Math.round(solution.greening_pct),
+      roof: Math.round(solution.coolroof_pct),
+      blue: Math.round(solution.blueinfra_ha),
+      dt: `${solution.delta_t_c >= 0 ? "+" : ""}${solution.delta_t_c.toFixed(1)}°C`,
+      cost: `₹ ${Math.round(solution.cost_cr).toLocaleString()}`,
+      equity: solution.equity_score.toFixed(2),
     }));
-  }, [paretoRaw]);
+  }, [paretoData]);
 
-  const paretoCount = paretoRaw?.length ?? 47;
+  const paretoCount = paretoData?.length ?? 47;
 
   const handlePointClick = (id: number) => {
     setSelectedId(id);
@@ -135,8 +134,8 @@ function ParetoPage() {
         </p>
         <div className="relative mt-6 h-[320px]">
           {paretoLoading ? (
-            <div className="flex h-full animate-pulse items-center justify-center bg-[#0a0a0a] font-mono text-[10px] uppercase text-[#6b6b6b]">
-              LOADING PARETO DATA...
+            <div className="flex h-full items-center justify-center bg-[#0a0a0a] font-mono text-[11px] text-[#6b6b6b]">
+              LOADING PARETO DATA ···
             </div>
           ) : (
             <Suspense fallback={<ChartFallback label="Loading Pareto chart" />}>

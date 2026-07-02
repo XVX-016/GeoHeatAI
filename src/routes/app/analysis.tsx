@@ -1,12 +1,12 @@
 import { lazy, Suspense, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { getDrivers } from "@/lib/api";
+import { api } from "@/lib/api";
 
 const ShapBarChart = lazy(() => import("@/components/ShapBarChart"));
 
 // Static fallback used when the backend is offline
-const STATIC_SHAP = [
+const FALLBACK_SHAP_DATA = [
   { name: "NDVI", value: -0.34, fill: "#1D9E75" },
   { name: "Building density", value: 0.28, fill: "#F97316" },
   { name: "Albedo", value: -0.22, fill: "#1D9E75" },
@@ -17,10 +17,21 @@ const STATIC_SHAP = [
   { name: "Humidity", value: -0.07, fill: "#1D9E75" },
 ] as const;
 
-const insights = [
+const FALLBACK_INSIGHTS = [
   "NDVI is the dominant cooling signal; each 0.1 unit increase suppresses LST by about 1.4°C in low-albedo zones.",
   "Building density drives 28% of daytime heating through impervious surface radiation trapping.",
   "Sky View Factor (SVF) controls nocturnal heat retention; high SVF zones show 2.1°C lower night-minimum LST.",
+] as const;
+
+const SKELETON_BAR_CLASSES = [
+  "h-[40%]",
+  "h-[48%]",
+  "h-[60%]",
+  "h-[44%]",
+  "h-[72%]",
+  "h-[56%]",
+  "h-[42%]",
+  "h-[64%]",
 ] as const;
 
 const matrixVars = ["LST", "NDVI", "NDBI", "ALBEDO", "BLDG", "SVF"] as const;
@@ -54,33 +65,20 @@ function AnalysisPage() {
 
   const { data: driversData, isLoading: driversLoading, isError: driversError } = useQuery({
     queryKey: ["drivers"],
-    queryFn: getDrivers,
-    retry: 1,
-    staleTime: 60_000,
+    queryFn: api.drivers,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 
-  // Build chart data from API if available, else fall back to static data
   const shapData = driversData
-    ? driversData.feature_names.map((name, i) => {
-        const val = driversData.mean_abs_shap[i];
-        // Use sign from static data where name matches, else positive = heating
-        const staticMatch = STATIC_SHAP.find(
-          (s) => s.name.toLowerCase() === name.toLowerCase(),
-        );
-        const signed = staticMatch ? Math.sign(staticMatch.value) * val : val;
-        return {
-          name,
-          value: Number(signed.toFixed(4)),
-          fill: signed < 0 ? "#1D9E75" : "#F97316",
-        };
-      })
-    : STATIC_SHAP;
+    ? driversData.features.map((name, i) => ({
+        name,
+        value: driversData.shap_values[i] ?? 0,
+        fill: (driversData.shap_values[i] ?? 0) < 0 ? "#1D9E75" : "#F97316",
+      }))
+    : FALLBACK_SHAP_DATA;
 
-  // Top-3 driver text lines
-  const insightLines: readonly string[] = driversData?.top_3_drivers.map(
-    (d, i) =>
-      `[${i + 1}] ${d.feature}: mean |SHAP| = ${d.mean_abs_shap_value.toFixed(3)}°C average impact on LST`,
-  ) ?? insights;
+  const insightLines = driversData?.top_3 ?? FALLBACK_INSIGHTS;
 
   return (
     <div className="px-8 py-8">
@@ -110,10 +108,12 @@ function AnalysisPage() {
           <p className="mt-2 font-sans text-[12px] leading-[1.7] text-[#a0a0a0]">
             Teal bars indicate cooling influence; orange bars indicate heating influence.
           </p>
-        <div className="mt-6 h-[280px]">
+          <div className="mt-6 h-[280px]">
             {driversLoading ? (
-              <div className="flex h-full animate-pulse items-center justify-center bg-[#0a0a0a] font-mono text-[10px] uppercase text-[#6b6b6b]">
-                LOADING SHAP DATA...
+              <div className="flex h-full items-end gap-2 bg-[#0a0a0a] p-4">
+                {SKELETON_BAR_CLASSES.map((heightClass, index) => (
+                  <div key={index} className={`flex-1 animate-pulse rounded-sm bg-[#1a1a1a] ${heightClass}`} />
+                ))}
               </div>
             ) : driversError ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 bg-[#0a0a0a]">
