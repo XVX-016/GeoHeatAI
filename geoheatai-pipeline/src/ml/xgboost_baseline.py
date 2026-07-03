@@ -68,7 +68,7 @@ def train_stacked_ensemble(X_train, y_train, X_val):
         X_va = X_train[val_idx]
         
         # Inner models
-        m_xgb = xgb.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1)
+        m_xgb = xgb.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, tree_method="hist")
         m_lgb = lgb.LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, verbose=-1)
         
         m_xgb.fit(X_tr, y_tr)
@@ -82,7 +82,7 @@ def train_stacked_ensemble(X_train, y_train, X_val):
     meta_learner.fit(oof_predictions, y_train)
 
     # 2. Fit final base models on all training data
-    final_xgb = xgb.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1)
+    final_xgb = xgb.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, tree_method="hist")
     final_lgb = lgb.LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, verbose=-1)
     
     final_xgb.fit(X_train, y_train)
@@ -132,23 +132,28 @@ def main():
         for z, c in zip(unique_zones, zone_counts):
             print(f"  Zone {z}: {c} patches")
 
-    # Spatial CV Loop (Leave-One-Zone-Out)
+        # If too few zones have data, fall back to k-fold CV
+        if unique_zones.size < 5:
+            print("INFO: Insufficient zone coverage for spatial CV. Using 5-fold KFold instead.")
+            spatial_split_available = False
+            zones = np.zeros(n_patches)
+
+    # Spatial CV Loop (Leave-One-Zone-Out or fallback KFold)
     r2_scores = []
     rmse_scores = []
     mae_scores = []
-    
-    # 9-fold spatial cross-validation
+    # Decide folds: leave-one-zone-out with up to 9 zones, or fallback to KFold
     if spatial_split_available:
         n_folds = 9
-        folds_to_run = range(9)
+        folds_to_run = range(n_folds)
+        print(f"\nStarting {n_folds}-fold spatial leave-one-zone-out cross-validation...")
     else:
-        n_folds = 9
-        folds_to_run = range(9)
-        # Fall back to sequential 9-fold CV
+        # Use 5-fold KFold when spatial coverage is insufficient
+        n_folds = 5
         kf = KFold(n_splits=n_folds, shuffle=True, random_state=42)
         cv_splits = list(kf.split(np.arange(n_patches)))
-
-    print(f"\nStarting {n_folds}-fold spatial leave-one-zone-out cross-validation...")
+        folds_to_run = range(n_folds)
+        print(f"\nINFO: Using {n_folds}-fold KFold cross-validation due to insufficient spatial coverage.")
 
     for fold in folds_to_run:
         if spatial_split_available:
@@ -171,6 +176,33 @@ def main():
         y_train = label_train.reshape(-1)
         X_val = feat_val.reshape(-1, n_features)
         y_val = label_val.reshape(-1)
+
+        # Clean invalid labels
+        n_before = len(y_train)
+        if n_before > 0:
+            valid_mask = np.isfinite(y_train)
+            X_train = X_train[valid_mask]
+            y_train = y_train[valid_mask]
+            # If centroids are available at patch-level, keep alignment (best-effort)
+            if 'centroids' in locals() and centroids.shape[0] == n_patches:
+                try:
+                    centroids_flat_train = np.repeat(centroids[train_patch_indices], patch_h * patch_w, axis=0)
+                    centroids_flat_train = centroids_flat_train[valid_mask]
+                except Exception:
+                    pass
+            n_removed = n_before - len(y_train)
+            if n_removed > 0:
+                pct = 100 * n_removed / n_before
+                print(f"INFO: Removed {n_removed} pixels ({pct:.1f}%) with NaN/Inf LST labels.")
+                if pct > 50:
+                    raise ValueError(
+                        f"More than 50% of labels are invalid ({pct:.1f}%). Check tile_to_hdf5.py masking logic."
+                    )
+
+        # Clamp LST to physically plausible range
+        if len(y_train) > 0:
+            y_train = np.clip(y_train, 0.0, 70.0)
+            print(f"LST range after cleaning: {y_train.min():.1f}°C to {y_train.max():.1f}°C")
 
         # Train stacking regressor
         preds, _, _, _ = train_stacked_ensemble(X_train, y_train, X_val)
@@ -196,6 +228,33 @@ def main():
     print("\nRetraining models on full dataset...")
     X_full = features.reshape(-1, n_features)
     y_full = labels.reshape(-1)
+
+    # Clean invalid labels for full dataset
+    n_before_full = len(y_full)
+    if n_before_full > 0:
+        valid_mask_full = np.isfinite(y_full)
+        X_full = X_full[valid_mask_full]
+        y_full = y_full[valid_mask_full]
+        # Align centroids if available
+        if 'centroids' in locals() and centroids.shape[0] == n_patches:
+            try:
+                centroids_flat = np.repeat(centroids, patch_h * patch_w, axis=0)
+                centroids_flat = centroids_flat[valid_mask_full]
+            except Exception:
+                pass
+        n_removed_full = n_before_full - len(y_full)
+        if n_removed_full > 0:
+            pct = 100 * n_removed_full / n_before_full
+            print(f"INFO: Removed {n_removed_full} pixels ({pct:.1f}%) with NaN/Inf LST labels (full dataset).")
+            if pct > 50:
+                raise ValueError(
+                    f"More than 50% of full-dataset labels are invalid ({pct:.1f}%). Check tile_to_hdf5.py masking logic."
+                )
+
+    # Clamp LST to physically plausible range for full dataset
+    if len(y_full) > 0:
+        y_full = np.clip(y_full, 0.0, 70.0)
+        print(f"LST range after cleaning: {y_full.min():.1f}°C to {y_full.max():.1f}°C")
 
     # Train final stacked ensemble
     _, final_xgb, final_lgb, final_ridge = train_stacked_ensemble(X_full, y_full, X_full)

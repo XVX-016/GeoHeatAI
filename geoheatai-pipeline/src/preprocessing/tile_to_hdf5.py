@@ -75,7 +75,7 @@ def compute_dataset_stats(tif_paths: list[Path], num_bands: int):
             stds[b] = np.sqrt(max(variance, 1e-10))
         print(f"  Band {BAND_NAMES[b]}: mean={means[b]:.4f}, std={stds[b]:.4f}")
 
-    return means, stds
+    return means, stds, band_counts
 
 def extract_scene_id(filename: str) -> str:
     """Extract standard scene ID from TIFF filename."""
@@ -111,6 +111,9 @@ def slice_and_process(
 
     # Projection transformer from UTM to Lat/Lon for centroids
     transformer = Transformer.from_crs(UTM_EPSG, "EPSG:4326", always_xy=True)
+
+    # Counter for patches skipped due to excessive invalid LST pixels
+    skipped_nan = 0
 
     for i, path in enumerate(tif_paths):
         scene_id = extract_scene_id(path.name)
@@ -155,8 +158,18 @@ def slice_and_process(
                     feat_patch_norm = (feat_patch - f_means) / f_stds
                     feat_patch_norm[np.isnan(feat_patch_norm)] = 0.0
 
-                    # For labels, replace NaNs with the overall mean LST as a fallback
-                    label_patch_filled = label_patch.copy()
+                    # LST patch: check finite pixel ratio and clamp
+                    lst_patch = label_patch[0]
+                    finite_ratio = np.isfinite(lst_patch).mean()
+                    if finite_ratio < 0.5:
+                        skipped_nan += 1
+                        continue
+
+                    # Clamp LST to physically plausible range (0°C - 70°C)
+                    lst_patch = np.clip(lst_patch, 0.0, 70.0)
+
+                    # Recreate label patch and fill remaining NaNs with mean
+                    label_patch_filled = lst_patch[None, ...].copy()
                     label_patch_filled[np.isnan(label_patch_filled)] = means[lst_index]
 
                     # Calculate spatial centroid coordinate
@@ -179,6 +192,8 @@ def slice_and_process(
     features_arr = np.array(all_features, dtype=np.float32)
     labels_arr = np.array(all_labels, dtype=np.float32)
     centroids_arr = np.array(all_centroids, dtype=np.float32)
+
+    print(f"Skipped {skipped_nan} patches with >50% invalid LST pixels")
 
     return features_arr, labels_arr, centroids_arr, all_scene_ids, feature_names
 
@@ -213,7 +228,12 @@ def main():
                     BAND_NAMES.append(f"BAND_{idx+1}")
 
     # Step 1: Compute statistics
-    means, stds = compute_dataset_stats(tif_paths, num_bands)
+    means, stds, band_counts = compute_dataset_stats(tif_paths, num_bands)
+
+    # Assess total valid pixel coverage (use LST band as representative)
+    total_valid_pixels = int(band_counts[LST_BAND_INDEX]) if LST_BAND_INDEX < len(band_counts) else int(np.sum(band_counts) // max(1, num_bands))
+    if total_valid_pixels < 500_000:
+        print(f"WARNING: Low pixel count ({total_valid_pixels} pixels). Stats may be noisy. Consider adding more scenes for production use.")
 
     # Step 2: Slice and normalize
     features, labels, centroids, scene_ids, feature_names = slice_and_process(
