@@ -97,6 +97,26 @@ def train_stacked_ensemble(X_train, y_train, X_val):
 
     return final_preds, final_xgb, final_lgb, meta_learner
 
+def clean_data(X: np.ndarray, y: np.ndarray, context: str = "dataset") -> tuple[np.ndarray, np.ndarray]:
+    """Remove rows with non-finite features or labels and clamp labels to [0, 70]."""
+    valid_mask = np.isfinite(y) & np.all(np.isfinite(X), axis=1)
+    n_before = len(y)
+    X_clean = X[valid_mask]
+    y_clean = y[valid_mask]
+    n_removed = n_before - len(y_clean)
+    if n_removed > 0:
+        pct = 100 * n_removed / n_before
+        print(f"INFO: Removed {n_removed} pixels ({pct:.1f}%) with NaN/Inf features or labels ({context}).")
+        if pct > 50:
+            raise ValueError(
+                f"More than 50% of {context} are invalid ({pct:.1f}%). Check tile_to_hdf5.py masking logic."
+            )
+    if len(y_clean) > 0:
+        y_clean = np.clip(y_clean, 0.0, 70.0)
+        print(f"LST range after cleaning ({context}): {y_clean.min():.1f}°C to {y_clean.max():.1f}°C")
+    return X_clean, y_clean
+
+
 def main():
     h5_path = DATA_PROCESSED / "delhi_tiles.h5"
     if not h5_path.exists():
@@ -177,32 +197,9 @@ def main():
         X_val = feat_val.reshape(-1, n_features)
         y_val = label_val.reshape(-1)
 
-        # Clean invalid labels
-        n_before = len(y_train)
-        if n_before > 0:
-            valid_mask = np.isfinite(y_train)
-            X_train = X_train[valid_mask]
-            y_train = y_train[valid_mask]
-            # If centroids are available at patch-level, keep alignment (best-effort)
-            if 'centroids' in locals() and centroids.shape[0] == n_patches:
-                try:
-                    centroids_flat_train = np.repeat(centroids[train_patch_indices], patch_h * patch_w, axis=0)
-                    centroids_flat_train = centroids_flat_train[valid_mask]
-                except Exception:
-                    pass
-            n_removed = n_before - len(y_train)
-            if n_removed > 0:
-                pct = 100 * n_removed / n_before
-                print(f"INFO: Removed {n_removed} pixels ({pct:.1f}%) with NaN/Inf LST labels.")
-                if pct > 50:
-                    raise ValueError(
-                        f"More than 50% of labels are invalid ({pct:.1f}%). Check tile_to_hdf5.py masking logic."
-                    )
-
-        # Clamp LST to physically plausible range
-        if len(y_train) > 0:
-            y_train = np.clip(y_train, 0.0, 70.0)
-            print(f"LST range after cleaning: {y_train.min():.1f}°C to {y_train.max():.1f}°C")
+        # Clean invalid features and labels for training
+        X_train, y_train = clean_data(X_train, y_train, context=f"fold {fold+1} train set")
+        X_val, y_val = clean_data(X_val, y_val, context=f"fold {fold+1} validation set")
 
         # Train stacking regressor
         preds, _, _, _ = train_stacked_ensemble(X_train, y_train, X_val)
@@ -229,32 +226,8 @@ def main():
     X_full = features.reshape(-1, n_features)
     y_full = labels.reshape(-1)
 
-    # Clean invalid labels for full dataset
-    n_before_full = len(y_full)
-    if n_before_full > 0:
-        valid_mask_full = np.isfinite(y_full)
-        X_full = X_full[valid_mask_full]
-        y_full = y_full[valid_mask_full]
-        # Align centroids if available
-        if 'centroids' in locals() and centroids.shape[0] == n_patches:
-            try:
-                centroids_flat = np.repeat(centroids, patch_h * patch_w, axis=0)
-                centroids_flat = centroids_flat[valid_mask_full]
-            except Exception:
-                pass
-        n_removed_full = n_before_full - len(y_full)
-        if n_removed_full > 0:
-            pct = 100 * n_removed_full / n_before_full
-            print(f"INFO: Removed {n_removed_full} pixels ({pct:.1f}%) with NaN/Inf LST labels (full dataset).")
-            if pct > 50:
-                raise ValueError(
-                    f"More than 50% of full-dataset labels are invalid ({pct:.1f}%). Check tile_to_hdf5.py masking logic."
-                )
-
-    # Clamp LST to physically plausible range for full dataset
-    if len(y_full) > 0:
-        y_full = np.clip(y_full, 0.0, 70.0)
-        print(f"LST range after cleaning: {y_full.min():.1f}°C to {y_full.max():.1f}°C")
+    # Clean invalid features and labels for full dataset
+    X_full, y_full = clean_data(X_full, y_full, context="full dataset")
 
     # Train final stacked ensemble
     _, final_xgb, final_lgb, final_ridge = train_stacked_ensemble(X_full, y_full, X_full)

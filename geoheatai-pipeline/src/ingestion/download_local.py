@@ -118,17 +118,42 @@ def download_scene_tile(
 
 def merge_scene_tiles(
     tile_paths: list[Path], scene_id: str, out_dir: Path
-) -> Path:
+) -> Path | None:
     """
     Mosaics all tile GeoTIFFs for one scene into a single file:
     out_dir / f"geoheatai_delhi_ncr_{scene_id}.tif", then deletes individual tiles.
+    Returns None if no tiles are available or merge fails.
     """
-    src_files = [rasterio.open(p) for p in tile_paths]
-    
-    # Merge datasets
-    mosaic, out_trans = merge(src_files)
-    
-    # Prepare output metadata
+    # Filter to files that actually exist (downloads may have removed some files)
+    existing_paths = [p for p in tile_paths if p and p.exists()]
+    if not existing_paths:
+        print(f"Warning: No tile files found for scene {scene_id} to merge.")
+        return None
+
+    src_files = []
+    for p in existing_paths:
+        try:
+            src_files.append(rasterio.open(p))
+        except Exception as e:
+            print(f"Warning: Skipping unreadable tile {p}: {e}")
+
+    if not src_files:
+        print(f"Warning: No readable tiles for scene {scene_id} after filtering.")
+        return None
+
+    # Merge datasets with guarded error handling
+    try:
+        mosaic, out_trans = merge(src_files)
+    except Exception as e:
+        print(f"Warning: Failed to merge tiles for scene {scene_id}: {e}")
+        for src in src_files:
+            try:
+                src.close()
+            except Exception:
+                pass
+        return None
+
+    # Prepare output metadata using first readable source
     out_meta = src_files[0].meta.copy()
     out_meta.update({
         "driver": "GTiff",
@@ -136,22 +161,34 @@ def merge_scene_tiles(
         "width": mosaic.shape[2],
         "transform": out_trans
     })
-    
+
     merged_path = out_dir / f"geoheatai_delhi_ncr_{scene_id}.tif"
-    with rasterio.open(merged_path, "w", **out_meta) as dest:
-        dest.write(mosaic)
-        
+    try:
+        with rasterio.open(merged_path, "w", **out_meta) as dest:
+            dest.write(mosaic)
+    except Exception as e:
+        print(f"Warning: Failed to write merged file for scene {scene_id}: {e}")
+        for src in src_files:
+            try:
+                src.close()
+            except Exception:
+                pass
+        return None
+
     # Close resources
     for src in src_files:
-        src.close()
-        
+        try:
+            src.close()
+        except Exception:
+            pass
+
     # Clean up individual tile files
-    for p in tile_paths:
+    for p in existing_paths:
         try:
             p.unlink()
         except Exception:
             pass
-            
+
     return merged_path
 
 def download_scene(
