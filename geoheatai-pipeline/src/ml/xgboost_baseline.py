@@ -63,7 +63,9 @@ def train_stacked_ensemble(X_train, y_train, X_val):
     inner_cv = KFold(n_splits=3, shuffle=True, random_state=42)
     oof_predictions = np.zeros((X_train.shape[0], 2)) # cols: xgb, lgbm
     
-    for train_idx, val_idx in inner_cv.split(X_train):
+    print(f"    Starting inner 3-fold CV for stacking (train size: {X_train.shape[0]})...", flush=True)
+    for fold_idx, (train_idx, val_idx) in enumerate(inner_cv.split(X_train), start=1):
+        print(f"      Inner CV fold {fold_idx}/3: training {len(train_idx)} rows, validating {len(val_idx)} rows", flush=True)
         X_tr, y_tr = X_train[train_idx], y_train[train_idx]
         X_va = X_train[val_idx]
         
@@ -72,12 +74,16 @@ def train_stacked_ensemble(X_train, y_train, X_val):
         m_lgb = lgb.LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, verbose=-1)
         
         m_xgb.fit(X_tr, y_tr)
+        print(f"      Completed XGBoost fit for inner fold {fold_idx}/3", flush=True)
         m_lgb.fit(X_tr, y_tr)
+        print(f"      Completed LightGBM fit for inner fold {fold_idx}/3", flush=True)
         
         oof_predictions[val_idx, 0] = m_xgb.predict(X_va)
         oof_predictions[val_idx, 1] = m_lgb.predict(X_va)
+        print(f"      Completed inner fold {fold_idx}/3 predictions", flush=True)
 
     # Fit Ridge meta-learner
+    print("    Fitting Ridge meta-learner on stacked predictions...", flush=True)
     meta_learner = Ridge(alpha=1.0)
     meta_learner.fit(oof_predictions, y_train)
 
@@ -85,17 +91,11 @@ def train_stacked_ensemble(X_train, y_train, X_val):
     final_xgb = xgb.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, tree_method="hist")
     final_lgb = lgb.LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, verbose=-1)
     
+    print("    Training final XGBoost and LightGBM on full training set...", flush=True)
     final_xgb.fit(X_train, y_train)
+    print("    Completed final XGBoost training", flush=True)
     final_lgb.fit(X_train, y_train)
-
-    # 3. Predict on validation
-    pred_xgb = final_xgb.predict(X_val)
-    pred_lgb = final_lgb.predict(X_val)
-    
-    val_meta_features = np.column_stack([pred_xgb, pred_lgb])
-    final_preds = meta_learner.predict(val_meta_features)
-
-    return final_preds, final_xgb, final_lgb, meta_learner
+    print("    Completed final LightGBM training", flush=True)
 
 def clean_data(X: np.ndarray, y: np.ndarray, context: str = "dataset") -> tuple[np.ndarray, np.ndarray]:
     """Remove rows with non-finite features or labels and clamp labels to [0, 70]."""
@@ -180,10 +180,12 @@ def main():
             train_patch_indices = np.where(zones != fold)[0]
             val_patch_indices = np.where(zones == fold)[0]
             if len(val_patch_indices) == 0:
-                print(f"  Fold {fold+1}/{n_folds} (Zone {fold}) skipped because it is empty.")
+                print(f"  Fold {fold+1}/{n_folds} (Zone {fold}) skipped because it is empty.", flush=True)
                 continue
         else:
             train_patch_indices, val_patch_indices = cv_splits[fold]
+
+        print(f"  Starting fold {fold+1}/{n_folds}: train patches={len(train_patch_indices)}, val patches={len(val_patch_indices)}", flush=True)
 
         # Extract patches
         feat_train = features[train_patch_indices]
@@ -216,10 +218,10 @@ def main():
         print(f"  Fold {fold+1}/{n_folds}: R² = {r2:.4f}, RMSE = {rmse:.4f}°C, MAE = {mae:.4f}°C")
 
     # Output cross-validation summary
-    print("\nSpatial CV Results (Stacked Ensemble):")
-    print(f"  Mean R²   = {np.mean(r2_scores):.4f} ± {np.std(r2_scores):.4f}")
-    print(f"  Mean RMSE = {np.mean(rmse_scores):.4f} ± {np.std(rmse_scores):.4f}°C")
-    print(f"  Mean MAE  = {np.mean(mae_scores):.4f} ± {np.std(mae_scores):.4f}°C")
+    print("\nSpatial CV Results (Stacked Ensemble):", flush=True)
+    print(f"  Mean R²   = {np.mean(r2_scores):.4f} ± {np.std(r2_scores):.4f}", flush=True)
+    print(f"  Mean RMSE = {np.mean(rmse_scores):.4f} ± {np.std(rmse_scores):.4f}°C", flush=True)
+    print(f"  Mean MAE  = {np.mean(mae_scores):.4f} ± {np.std(mae_scores):.4f}°C", flush=True)
 
     # Retrain on the ENTIRE dataset for the final model
     print("\nRetraining models on full dataset...")
