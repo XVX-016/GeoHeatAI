@@ -61,23 +61,23 @@ def train_stacked_ensemble(X_train, y_train, X_val):
     """
     # 1. Generate out-of-fold features for the Ridge meta-learner
     inner_cv = KFold(n_splits=3, shuffle=True, random_state=42)
-    oof_predictions = np.zeros((X_train.shape[0], 2)) # cols: xgb, lgbm
-    
+    oof_predictions = np.zeros((X_train.shape[0], 2))  # cols: xgb, lgbm
+
     print(f"    Starting inner 3-fold CV for stacking (train size: {X_train.shape[0]})...", flush=True)
     for fold_idx, (train_idx, val_idx) in enumerate(inner_cv.split(X_train), start=1):
         print(f"      Inner CV fold {fold_idx}/3: training {len(train_idx)} rows, validating {len(val_idx)} rows", flush=True)
         X_tr, y_tr = X_train[train_idx], y_train[train_idx]
         X_va = X_train[val_idx]
-        
+
         # Inner models
         m_xgb = xgb.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, tree_method="hist")
         m_lgb = lgb.LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, verbose=-1)
-        
+
         m_xgb.fit(X_tr, y_tr)
         print(f"      Completed XGBoost fit for inner fold {fold_idx}/3", flush=True)
         m_lgb.fit(X_tr, y_tr)
         print(f"      Completed LightGBM fit for inner fold {fold_idx}/3", flush=True)
-        
+
         oof_predictions[val_idx, 0] = m_xgb.predict(X_va)
         oof_predictions[val_idx, 1] = m_lgb.predict(X_va)
         print(f"      Completed inner fold {fold_idx}/3 predictions", flush=True)
@@ -90,12 +90,16 @@ def train_stacked_ensemble(X_train, y_train, X_val):
     # 2. Fit final base models on all training data
     final_xgb = xgb.XGBRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, tree_method="hist")
     final_lgb = lgb.LGBMRegressor(n_estimators=100, max_depth=6, learning_rate=0.1, random_state=42, n_jobs=-1, verbose=-1)
-    
+
     print("    Training final XGBoost and LightGBM on full training set...", flush=True)
     final_xgb.fit(X_train, y_train)
     print("    Completed final XGBoost training", flush=True)
     final_lgb.fit(X_train, y_train)
     print("    Completed final LightGBM training", flush=True)
+
+    stacked_val = np.column_stack((final_xgb.predict(X_val), final_lgb.predict(X_val)))
+    preds = meta_learner.predict(stacked_val)
+    return preds, final_xgb, final_lgb, meta_learner
 
 def clean_data(X: np.ndarray, y: np.ndarray, context: str = "dataset") -> tuple[np.ndarray, np.ndarray]:
     """Remove rows with non-finite features or labels and clamp labels to [0, 70]."""

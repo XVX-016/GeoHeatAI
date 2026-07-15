@@ -165,5 +165,3 @@ https://code.earthengine.google.com/tasks
 - `SVF_PROXY` is not a true ray-traced Sky View Factor; it is a first-order
   approximation from GHSL height and built surface fraction.
 
-
-hehehehhe
