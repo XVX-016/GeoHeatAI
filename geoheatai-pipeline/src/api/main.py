@@ -110,6 +110,7 @@ def compute_zone_averages_api(features: np.ndarray, centroids: np.ndarray) -> np
 @app.on_event("startup")
 def load_assets():
     """Pre-load model parameters, SHAP summaries, and Pareto data into memory."""
+    # sync load acceptable for local demo
     global xgb_model, lgbm_model, ridge_model, pareto_data, shap_data, recommended_data
     global baseline_zone_feats, baseline_lst, means, stds, band_names
     global ndvi_idx, albedo_idx, ndwi_idx, built_idx

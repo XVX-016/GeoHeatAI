@@ -223,8 +223,9 @@ def train_pinn_unet(
     train_sampler = torch.utils.data.SubsetRandomSampler(train_indices)
     val_sampler = torch.utils.data.SubsetRandomSampler(val_indices)
 
-    train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler, pin_memory=True)
-    val_loader = DataLoader(dataset, batch_size=batch_size, sampler=val_sampler, pin_memory=True)
+    # Set num_workers=0 to prevent multiprocessing issues on Windows (fork/spawn behavior)
+    train_loader = DataLoader(dataset, batch_size=batch_size, sampler=train_sampler, pin_memory=True, num_workers=0)
+    val_loader = DataLoader(dataset, batch_size=batch_size, sampler=val_sampler, pin_memory=True, num_workers=0)
 
     # Determine input features dimension
     with h5py.File(h5_path, "r") as h5f:

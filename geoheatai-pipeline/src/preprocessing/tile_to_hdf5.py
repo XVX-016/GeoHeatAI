@@ -52,18 +52,26 @@ def compute_dataset_stats(tif_paths: list[Path], num_bands: int):
     for i, path in enumerate(tif_paths):
         print(f"  [{i+1}/{len(tif_paths)}] Reading {path.name}...")
         with rasterio.open(path) as src:
-            data = src.read()  # shape (num_bands, height, width)
-            for b in range(num_bands):
-                band_data = data[b]
-                valid_mask = ~np.isnan(band_data)
-                if src.nodata is not None:
-                    valid_mask &= (band_data != src.nodata)
-                
-                valid_pixels = band_data[valid_mask]
-                if len(valid_pixels) > 0:
-                    band_sums[b] += np.sum(valid_pixels)
-                    band_sq_sums[b] += np.sum(valid_pixels ** 2)
-                    band_counts[b] += len(valid_pixels)
+            height = src.height
+            width = src.width
+            chunk_size = 256
+            for y in range(0, height, chunk_size):
+                h_chunk = min(chunk_size, height - y)
+                for x in range(0, width, chunk_size):
+                    w_chunk = min(chunk_size, width - x)
+                    window = rasterio.windows.Window(x, y, w_chunk, h_chunk)
+                    data = src.read(window=window)  # shape (num_bands, h_chunk, w_chunk)
+                    for b in range(num_bands):
+                        band_data = data[b]
+                        valid_mask = ~np.isnan(band_data)
+                        if src.nodata is not None:
+                            valid_mask &= (band_data != src.nodata)
+                        
+                        valid_pixels = band_data[valid_mask]
+                        if len(valid_pixels) > 0:
+                            band_sums[b] += np.sum(valid_pixels.astype(np.float64))
+                            band_sq_sums[b] += np.sum(valid_pixels.astype(np.float64) ** 2)
+                            band_counts[b] += len(valid_pixels)
 
     means = np.zeros(num_bands, dtype=np.float32)
     stds = np.ones(num_bands, dtype=np.float32)

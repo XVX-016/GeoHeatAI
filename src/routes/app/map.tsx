@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
@@ -51,6 +53,12 @@ export const Route = createFileRoute("/app/map")({
 });
 
 function MapPage() {
+  const { data: healthData } = useQuery({
+    queryKey: ["health"],
+    queryFn: api.health,
+  });
+  const isMockMode = healthData?.isMock ?? false;
+
   const [city, setCity] = useState<(typeof CITIES)[number]>("Delhi NCR");
   const [fromDate, setFromDate] = useState("2026-06-01");
   const [toDate, setToDate] = useState("2026-06-15");
@@ -115,8 +123,14 @@ function MapPage() {
   };
 
   return (
-    <div className="flex h-full min-h-[calc(100vh-3rem)] gap-6">
-      <aside className="w-[280px] flex-shrink-0 border-r border-[#1a1a1a] pr-5">
+    <div className="flex flex-col h-full min-h-[calc(100vh-3rem)] gap-4">
+      {isMockMode && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] px-4 py-2 font-mono text-[10px] text-[#6b6b6b] text-center">
+          DEMO MODE — Live model outputs available when backend is running locally. See README for setup.
+        </div>
+      )}
+      <div className="flex flex-1 gap-6">
+        <aside className="w-[280px] flex-shrink-0 border-r border-[#1a1a1a] pr-5">
         <div className="space-y-6 py-4">
           <section className="space-y-4">
             <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">LOCATION</div>
@@ -287,6 +301,7 @@ function MapPage() {
           <Marker className="left-[45%] top-[70%]" label="SHAHDARA · 44°C LST" />
         </div>
       </section>
+      </div>
     </div>
   );
 }

@@ -61,6 +61,12 @@ export const Route = createFileRoute("/app/analysis")({
 });
 
 function AnalysisPage() {
+  const { data: healthData } = useQuery({
+    queryKey: ["health"],
+    queryFn: api.health,
+  });
+  const isMockMode = healthData?.isMock ?? false;
+
   const [activeTab, setActiveTab] = useState<(typeof tabLabels)[number]>(tabLabels[0]);
 
   const { data: driversData, isLoading: driversLoading, isError: driversError } = useQuery({
@@ -81,7 +87,12 @@ function AnalysisPage() {
   const insightLines = driversData?.top_3 ?? FALLBACK_INSIGHTS;
 
   return (
-    <div className="px-8 py-8">
+    <div className="px-8 py-8 flex flex-col gap-6">
+      {isMockMode && (
+        <div className="bg-[#1a1a1a] border border-[#2a2a2a] px-4 py-2 font-mono text-[10px] text-[#6b6b6b] text-center">
+          DEMO MODE — Live model outputs available when backend is running locally. See README for setup.
+        </div>
+      )}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">DRIVER ANALYSIS</div>

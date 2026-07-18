@@ -207,6 +207,14 @@ def main():
         X_train, y_train = clean_data(X_train, y_train, context=f"fold {fold+1} train set")
         X_val, y_val = clean_data(X_val, y_val, context=f"fold {fold+1} validation set")
 
+        # Sample train set to prevent OOM
+        n_samples_tr = min(5_000_000, len(X_train))
+        rng_tr = np.random.default_rng(42)
+        indices_tr = rng_tr.choice(len(X_train), size=n_samples_tr, replace=False)
+        X_train = X_train[indices_tr]
+        y_train = y_train[indices_tr]
+        print(f"    Sampled {len(X_train)} rows for training fold {fold+1}.")
+
         # Train stacking regressor
         preds, _, _, _ = train_stacked_ensemble(X_train, y_train, X_val)
 
@@ -234,6 +242,14 @@ def main():
 
     # Clean invalid features and labels for full dataset
     X_full, y_full = clean_data(X_full, y_full, context="full dataset")
+
+    # Sample full dataset to prevent OOM
+    n_samples_full = min(5_000_000, len(X_full))
+    rng_full = np.random.default_rng(42)
+    indices_full = rng_full.choice(len(X_full), size=n_samples_full, replace=False)
+    X_full = X_full[indices_full]
+    y_full = y_full[indices_full]
+    print(f"    Sampled {len(X_full)} rows for training on full dataset.")
 
     # Train final stacked ensemble
     _, final_xgb, final_lgb, final_ridge = train_stacked_ensemble(X_full, y_full, X_full)
