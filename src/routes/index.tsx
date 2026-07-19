@@ -24,8 +24,8 @@ function Nav() {
     <header className="fixed top-0 left-0 right-0 z-50 bg-black/60 backdrop-blur-md border-b border-[#1a1a1a]">
       <div className="mx-auto max-w-[1440px] px-6 md:px-10 h-14 flex items-center justify-between">
         <a href="#top" className="flex items-center gap-2 font-sans text-[15px] font-semibold text-white">
-          <span className="lowercase">geoheat<span className="text-[#F97316] font-black">AI</span></span>
-          <span className="h-1.5 w-1.5 bg-[#F97316] rounded-full" aria-hidden />
+          <span className="text-white font-semibold">GEOHEAT</span>
+          <span className="text-[#F97316] font-semibold">AI</span>
         </a>
 
       </div>
@@ -107,12 +107,16 @@ const TICKER = [
 
 function Marquee() {
   return (
-    <div className="overflow-hidden border-b border-[#1a1a1a] py-5 bg-black">
-      <div className="flex gap-12 whitespace-nowrap font-sans font-semibold text-[22px] md:text-[32px]">
-        {TICKER.map((t, i) => (
-          <span key={i} className="flex items-center gap-12 text-white">
-            <span className={i % 2 === 0 ? "text-[#F97316]" : ""}>{t}</span>
-            <span className="text-[#2a2a2a]">●</span>
+    <div className="relative w-full overflow-hidden border-t border-b border-[#1a1a1a] py-3">
+      <div className="ticker-track flex gap-12 whitespace-nowrap">
+        {[...TICKER, ...TICKER].map((item, i) => (
+          <span
+            key={i}
+            className={`font-mono text-[11px] uppercase tracking-widest shrink-0 ${
+              i % 2 === 0 ? "text-[#F97316]" : "text-white"
+            }`}
+          >
+            {item}
           </span>
         ))}
       </div>

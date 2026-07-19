@@ -46,11 +46,11 @@ function EarthMesh() {
   return (
     <>
       <mesh ref={ref}>
-        <sphereGeometry args={[1.6, 96, 96]} />
+        <sphereGeometry args={[1.44, 96, 96]} />
         <meshBasicMaterial map={texture} />
       </mesh>
       <mesh>
-        <sphereGeometry args={[1.605, 48, 32]} />
+        <sphereGeometry args={[1.445, 48, 32]} />
         <meshBasicMaterial color="#ffffff" wireframe transparent opacity={0.06} />
       </mesh>
     </>
@@ -60,7 +60,7 @@ function EarthMesh() {
 export default function Earth3D() {
   return (
     <Canvas
-      camera={{ position: [0, 0, 4.2], fov: 45 }}
+      camera={{ position: [0, 0, 4.2], fov: 40 }}
       dpr={[1, 2]}
       gl={{ antialias: true, alpha: true }}
     >
