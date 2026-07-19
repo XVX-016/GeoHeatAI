@@ -76,7 +76,10 @@ function AppShell() {
       <div className="ml-[240px] min-h-screen bg-black">
         <header className="flex h-12 items-center justify-between border-b border-[#1a1a1a] px-6">
           <div className="font-mono text-[11px] uppercase text-[#6b6b6b]">{currentPage}</div>
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase text-white">
+          <div
+            className="flex items-center gap-2 font-mono text-[10px] uppercase text-white"
+            title="Demo mode: representative data shown. Run python src/api/main.py locally for live model outputs."
+          >
             <span
               className={`h-2 w-2 rounded-full transition-colors ${
                 backendOnline ? "bg-emerald-400" : "bg-yellow-400"

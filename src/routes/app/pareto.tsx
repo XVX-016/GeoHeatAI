@@ -148,13 +148,13 @@ function ParetoPage() {
             </Suspense>
           )}
 
-          {recommended && (
-            <div className="pointer-events-none absolute left-4 top-4 flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-[#F97316]" />
-              <div className="font-mono text-[10px] text-[#F97316]">RECOMMENDED TRADEOFF</div>
-            </div>
-          )}
         </div>
+
+        {recommended && (
+          <div className="border border-[#F97316]/30 bg-[#F97316]/5 p-3 mt-3 font-mono text-[10px] text-[#F97316]">
+            ● RECOMMENDED TRADEOFF — {recommended.solution_id}: highest ΔT within budget
+          </div>
+        )}
 
         <div className="mt-6">
           <div className="font-mono text-[10px] uppercase text-[#6b6b6b]">REWEIGHT OBJECTIVES</div>
@@ -185,7 +185,7 @@ function ParetoPage() {
 
         <div className="mt-6">
           <div className="overflow-x-auto">
-            <table className="w-full table-fixed border-collapse">
+            <table className="w-full table-auto border-collapse min-w-[640px]">
               <thead className="bg-[#0a0a0a]">
                 <tr className="border-b border-[#1a1a1a]">
                   <TableHead label="ID" description="Plan" alignLeft />

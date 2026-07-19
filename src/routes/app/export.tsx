@@ -106,6 +106,9 @@ function ExportPage() {
           />
         </div>
       </div>
+      <div className="font-mono text-[9px] text-[#6b6b6b] mt-2 text-center">
+        Metrics reflect trained model. Connect backend to verify live outputs.
+      </div>
     </div>
   );
 }

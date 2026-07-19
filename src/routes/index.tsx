@@ -1,6 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { lazy, Suspense, useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { createFileRoute } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -28,12 +27,7 @@ function Nav() {
           <span className="lowercase">geoheat<span className="text-[#F97316] font-black">AI</span></span>
           <span className="h-1.5 w-1.5 bg-[#F97316] rounded-full" aria-hidden />
         </a>
-        <Link
-          to="/app/map"
-          className="font-mono text-[11px] uppercase text-[#a0a0a0] transition-colors hover:text-white"
-        >
-          Core Interface ↗
-        </Link>
+
       </div>
     </header>
   );
@@ -81,7 +75,10 @@ function Hero() {
             >
               Access Core Interface →
             </a>
-            <button className="border border-[#2a2a2a] text-white px-6 py-3 text-[13px] font-semibold hover:border-white transition-colors">
+            <button
+              onClick={() => document.getElementById('methodology')?.scrollIntoView({ behavior: 'smooth' })}
+              className="border border-[#2a2a2a] text-white px-6 py-3 text-[13px] font-semibold hover:border-white transition-colors"
+            >
               View Methodology ↗
             </button>
           </div>
@@ -109,21 +106,16 @@ const TICKER = [
 ];
 
 function Marquee() {
-  const items = [...TICKER, ...TICKER];
   return (
-    <div className="relative overflow-hidden border-b border-[#1a1a1a] py-5 bg-black">
-      <motion.div
-        className="flex gap-12 whitespace-nowrap font-sans font-semibold text-[22px] md:text-[32px]"
-        animate={{ x: ["0%", "-50%"] }}
-        transition={{ duration: 45, ease: "linear", repeat: Infinity }}
-      >
-        {items.map((t, i) => (
+    <div className="overflow-hidden border-b border-[#1a1a1a] py-5 bg-black">
+      <div className="flex gap-12 whitespace-nowrap font-sans font-semibold text-[22px] md:text-[32px]">
+        {TICKER.map((t, i) => (
           <span key={i} className="flex items-center gap-12 text-white">
             <span className={i % 2 === 0 ? "text-[#F97316]" : ""}>{t}</span>
             <span className="text-[#2a2a2a]">●</span>
           </span>
         ))}
-      </motion.div>
+      </div>
     </div>
   );
 }
@@ -148,7 +140,7 @@ const RESEARCH = [
 
 function Research() {
   return (
-    <section className="border-b border-[#1a1a1a]">
+    <section id="methodology" className="border-b border-[#1a1a1a]">
       <Marquee />
       <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-24 md:py-32">
         <h2 className="font-sans font-semibold text-white text-[36px] md:text-[56px] leading-[1.1] max-w-4xl">
@@ -180,26 +172,23 @@ function Research() {
   );
 }
 
+const STATIC_BAR_DATA = [
+  42, 45, 48, 44,
+  75, 78, 80, 76,
+  30, 32, 35, 28,
+];
+
 function BarWidget() {
-  const [data, setData] = useState<number[]>(() => Array.from({ length: 12 }, () => 30 + Math.random() * 70));
-  useEffect(() => {
-    const id = setInterval(() => {
-      setData((d) => d.map((v) => Math.max(10, Math.min(100, v + (Math.random() - 0.5) * 22))));
-    }, 900);
-    return () => clearInterval(id);
-  }, []);
   return (
     <div className="w-full">
       <div className="flex items-end gap-1.5 h-32">
-        {data.map((v, i) => {
+        {STATIC_BAR_DATA.map((v, i) => {
           const color = v > 75 ? "#EF4444" : v > 55 ? "#F97316" : v > 35 ? "#FBBF24" : "#2a2a2a";
           return (
-            <motion.div
+            <div
               key={i}
-              animate={{ height: `${v}%` }}
-              transition={{ duration: 0.7, ease: "easeOut" }}
               className="flex-1"
-              style={{ backgroundColor: color }}
+              style={{ height: `${v}%`, backgroundColor: color }}
             />
           );
         })}
@@ -304,8 +293,6 @@ function Philosophy() {
 }
 
 function Footer() {
-  const center = ["Dashboard", "Analysis", "Scenarios", "Export"];
-  const right = ["LinkedIn", "GitHub", "Portfolio"];
   return (
     <footer className="border-t border-[#1f1f1f]">
       <div className="mx-auto max-w-[1440px] px-6 md:px-10 py-6 flex flex-col md:flex-row items-center justify-between gap-4 font-mono text-[11px] uppercase tracking-wide">
@@ -314,20 +301,9 @@ function Footer() {
           <span className="text-[#6b6b6b]"> © 2026</span>
         </div>
         <nav className="flex items-center gap-3 text-[#a0a0a0]">
-          {center.map((l, i) => (
-            <span key={l} className="flex items-center gap-3">
-              <a href="#" className="hover:text-white transition-colors">{l}</a>
-              {i < center.length - 1 && <span className="text-[#3a3a3a]">|</span>}
-            </span>
-          ))}
-        </nav>
-        <nav className="flex items-center gap-3 text-[#a0a0a0]">
-          {right.map((l, i) => (
-            <span key={l} className="flex items-center gap-3">
-              <a href="#" className="hover:text-white transition-colors">{l}</a>
-              {i < right.length - 1 && <span className="text-[#3a3a3a]">|</span>}
-            </span>
-          ))}
+          <a href="https://github.com/XVX-016/GeoHeatAI" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">GitHub</a>
+          <span className="text-[#3a3a3a]">|</span>
+          <a href="https://tanmmay.me" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Portfolio</a>
         </nav>
       </div>
     </footer>

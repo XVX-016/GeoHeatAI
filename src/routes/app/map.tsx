@@ -126,7 +126,7 @@ function MapPage() {
     <div className="flex flex-col h-full min-h-[calc(100vh-3rem)] gap-4">
       {isMockMode && (
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] px-4 py-2 font-mono text-[10px] text-[#6b6b6b] text-center">
-          DEMO MODE — Live model outputs available when backend is running locally. See README for setup.
+          DEMO MODE · Representative Delhi NCR outputs · Run local backend for live satellite data
         </div>
       )}
       <div className="flex flex-1 gap-6">

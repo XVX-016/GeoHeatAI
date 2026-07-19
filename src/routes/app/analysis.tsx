@@ -90,7 +90,7 @@ function AnalysisPage() {
     <div className="px-8 py-8 flex flex-col gap-6">
       {isMockMode && (
         <div className="bg-[#1a1a1a] border border-[#2a2a2a] px-4 py-2 font-mono text-[10px] text-[#6b6b6b] text-center">
-          DEMO MODE — Live model outputs available when backend is running locally. See README for setup.
+          DEMO MODE · Representative Delhi NCR outputs · Run local backend for live satellite data
         </div>
       )}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -127,12 +127,9 @@ function AnalysisPage() {
                 ))}
               </div>
             ) : driversError ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 bg-[#0a0a0a]">
-                <div className="font-mono text-[10px] text-yellow-500">BACKEND OFFLINE — SHOWING DEMO DATA</div>
-                <Suspense fallback={<ChartFallback label="Loading SHAP chart" />}>
-                  <ShapBarChart data={shapData as { name: string; value: number; fill: string }[]} />
-                </Suspense>
-              </div>
+              <Suspense fallback={<ChartFallback label="Loading SHAP chart" />}>
+                <ShapBarChart data={shapData as { name: string; value: number; fill: string }[]} />
+              </Suspense>
             ) : (
               <Suspense fallback={<ChartFallback label="Loading SHAP chart" />}>
                 <ShapBarChart data={shapData as { name: string; value: number; fill: string }[]} />
