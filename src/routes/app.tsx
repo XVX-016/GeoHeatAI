@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-r
 import { BarChart3, Download, GitBranch, Layers, SlidersHorizontal } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { Footer } from "@/components/Footer";
 
 const APP_NAV = [
   { label: "MAP", to: "/app/map", Icon: Layers },
@@ -35,12 +36,10 @@ function AppShell() {
     <div className="min-h-screen bg-black text-white">
       <aside className="fixed inset-y-0 left-0 flex w-[240px] flex-col border-r border-[#1a1a1a] bg-black text-white">
         <div className="px-6 py-5">
-          <div className="flex items-center gap-2 font-sans text-[15px] font-semibold">
-            <span className="lowercase">
-              geoheat<span className="text-[#F97316]">AI</span>
-            </span>
-            <span className="h-1.5 w-1.5 rounded-full bg-[#F97316]" aria-hidden />
-          </div>
+          <Link to="/" className="flex items-center gap-2 font-sans text-[15px] font-semibold text-white">
+            <span className="text-white font-semibold">GEOHEAT</span>
+            <span className="text-[#F97316] font-semibold">AI</span>
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-2 px-2 py-5">
@@ -73,26 +72,29 @@ function AppShell() {
         </div>
       </aside>
 
-      <div className="ml-[240px] min-h-screen bg-black">
-        <header className="flex h-12 items-center justify-between border-b border-[#1a1a1a] px-6">
-          <div className="font-mono text-[11px] uppercase text-[#6b6b6b]">{currentPage}</div>
-          <div
-            className="flex items-center gap-2 font-mono text-[10px] uppercase text-white"
-            title="Demo mode: representative data shown. Run python src/api/main.py locally for live model outputs."
-          >
-            <span
-              className={`h-2 w-2 rounded-full transition-colors ${
-                backendOnline ? "bg-emerald-400" : "bg-yellow-400"
-              }`}
-              aria-hidden
-            />
-            {backendOnline ? "PIPELINE READY" : "BACKEND OFFLINE"}
-          </div>
-        </header>
+      <div className="ml-[240px] min-h-screen bg-black flex flex-col justify-between">
+        <div>
+          <header className="flex h-12 items-center justify-between border-b border-[#1a1a1a] px-6">
+            <div className="font-mono text-[11px] uppercase text-[#6b6b6b]">{currentPage}</div>
+            <div
+              className="flex items-center gap-2 font-mono text-[10px] uppercase text-white"
+              title="Demo mode: representative data shown. Run python src/api/main.py locally for live model outputs."
+            >
+              <span
+                className={`h-2 w-2 rounded-full transition-colors ${
+                  backendOnline ? "bg-emerald-400" : "bg-yellow-400"
+                }`}
+                aria-hidden
+              />
+              {backendOnline ? "PIPELINE READY" : "BACKEND OFFLINE"}
+            </div>
+          </header>
 
-        <main className="min-h-[calc(100vh-3rem)] bg-black px-6 py-8">
-          <Outlet />
-        </main>
+          <main className="bg-black px-6 py-8">
+            <Outlet />
+          </main>
+        </div>
+        <Footer />
       </div>
     </div>
   );
